@@ -1,0 +1,2 @@
+# mrkamqp
+Simple AMQP Client
