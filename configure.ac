@@ -65,6 +65,16 @@ AM_SILENT_RULES([yes])
 
 dnl AM_MAINTAINER_MODE
 
+AC_CHECK_HEADERS([arpa/inet.h endian.h sys/endian.h])
+AC_TYPE_INT8_T
+AC_TYPE_UINT8_T
+AC_TYPE_INT16_T
+AC_TYPE_UINT16_T
+AC_TYPE_INT32_T
+AC_TYPE_UINT32_T
+AC_TYPE_INT64_T
+AC_TYPE_UINT64_T
+
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile man/Makefile])
 
 AC_CONFIG_HEADERS(config.h)

@@ -12,9 +12,9 @@ lib_LTLIBRARIES = libmrkamqp.la
 
 nobase_include_HEADERS = mrkamqp.h
 
-noinst_HEADERS =
+noinst_HEADERS = mrkamqp_private.h
 
-libmrkamqp_la_SOURCES = mrkamqp.c
+libmrkamqp_la_SOURCES = mrkamqp.c wire.c
 nodist_libmrkamqp_la_SOURCES = diag.c
 
 if DEBUG

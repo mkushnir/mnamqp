@@ -31,8 +31,8 @@ then
 
 elif test "$1" = "dist"
 then
-    unset LDFLAGS
-    unset CFLAGS
+    #unset LDFLAGS
+    #unset CFLAGS
     autoreconf
     ./configure
 
