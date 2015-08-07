@@ -32,11 +32,15 @@ extern "C" {
 struct _amqp_value;
 
 typedef void (*amqp_encode)(struct _amqp_value *, bytestream_t *);
-typedef int (*amqp_decode)(struct _amqp_value *, bytestream_t *, int);
+typedef ssize_t (*amqp_decode)(struct _amqp_value *, bytestream_t *, int);
+typedef size_t (*amqp_len)(struct _amqp_value *);
+typedef void (*amqp_kill)(struct _amqp_value *);
 
 typedef struct _amqp_type {
     amqp_encode enc;
     amqp_decode dec;
+    amqp_len len;
+    amqp_kill kill;
     uint8_t tag;
 } amqp_type_t;
 
@@ -59,12 +63,48 @@ typedef struct _amqp_value {
         uint64_t u64;
         float f;
         double d;
-        amqp_decimal_t dec;
+        amqp_decimal_t dc;
         bytes_t *str;
         array_t a;
         dict_t t;
     } value;
 } amqp_value_t;
+
+
+/*
+ * wire
+ */
+#define UNPACK_ECONSUME (-2)
+
+void pack_octet(bytestream_t *, uint8_t);
+ssize_t unpack_octet(bytestream_t *, int, uint8_t *);
+void pack_short(bytestream_t *, uint16_t);
+ssize_t unpack_short(bytestream_t *, int, uint16_t *);
+void pack_long(bytestream_t *, uint32_t);
+ssize_t unpack_long(bytestream_t *, int, uint32_t *);
+void pack_longlong(bytestream_t *, uint64_t);
+ssize_t unpack_longlong(bytestream_t *, int, uint64_t *v);
+void pack_float(bytestream_t *, float);
+ssize_t unpack_float(bytestream_t *, int, float *);
+void pack_double(bytestream_t *, double);
+ssize_t unpack_double(bytestream_t *, int, double *);
+void pack_shortstr(bytestream_t *, bytes_t *);
+ssize_t unpack_shortstr(bytestream_t *, int, bytes_t **);
+void pack_longstr(bytestream_t *, bytes_t *);
+ssize_t unpack_longstr(bytestream_t *, int, bytes_t **);
+void pack_table(bytestream_t *, dict_t *);
+ssize_t unpack_table(bytestream_t *, int, dict_t *);
+
+int amqp_decode_table(bytestream_t *, int, amqp_value_t **);
+void amqp_value_destroy(amqp_value_t **);
+
+
+/*
+ * module
+ */
+void mrkamqp_init(void);
+void mrkamqp_fini(void);
+
 
 #ifdef __cplusplus
 }
