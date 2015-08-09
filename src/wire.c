@@ -343,19 +343,27 @@ pack_field_value(bytestream_t *bs, amqp_value_t *v)
 static ssize_t
 unpack_field_value(bytestream_t *bs, int fd, amqp_value_t **v)
 {
+    amqp_type_t *ty;
     ssize_t res0, res1;
     uint8_t tag;
+
+    if ((res0 = unpack_octet(bs, fd, &tag)) < 0) {
+        TRRET(UNPACK_ECONSUME);
+    }
+
+    ty = amqp_type_by_tag(tag);
+
+    if (ty->tag != tag || ty->enc == NULL) {
+        TRRET(UNPACK_ECONSUME);
+    }
 
     if (*v == NULL) {
         if ((*v = malloc(sizeof(amqp_value_t))) == NULL) {
             FAIL("malloc");
         }
     }
-    if ((res0 = unpack_octet(bs, fd, &tag)) < 0) {
-        TRRET(UNPACK_ECONSUME);
-    }
 
-    (*v)->ty = amqp_type_by_tag(tag);
+    (*v)->ty = ty;
 
     if ((res1 = (*v)->ty->dec(*v, bs, fd)) < 0) {
         TRRET(UNPACK_ECONSUME);
