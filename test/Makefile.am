@@ -20,7 +20,7 @@ endif
 nodist_testfoo_SOURCES = ../src/diag.c
 testfoo_SOURCES = testfoo.c
 testfoo_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
-testfoo_LDFLAGS = -L$(libdir) -lmrkcommon -L$(top_srcdir)/src/.libs -lmrkamqp
+testfoo_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
 	sh ../src/gen-diag mrkamqp

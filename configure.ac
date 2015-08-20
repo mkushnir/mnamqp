@@ -66,6 +66,13 @@ AM_SILENT_RULES([yes])
 dnl AM_MAINTAINER_MODE
 
 AC_CHECK_HEADERS([arpa/inet.h endian.h sys/endian.h])
+AC_CHECK_HEADERS([netdb.h])
+AC_CHECK_HEADERS([netinet/in.h])
+AC_CHECK_HEADERS([sys/socket.h])
+AC_CHECK_HEADER_STDBOOL
+AC_TYPE_OFF_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
 AC_TYPE_INT8_T
 AC_TYPE_UINT8_T
 AC_TYPE_INT16_T
@@ -74,6 +81,11 @@ AC_TYPE_INT32_T
 AC_TYPE_UINT32_T
 AC_TYPE_INT64_T
 AC_TYPE_UINT64_T
+AC_CHECK_FUNCS([memset])
+AC_CHECK_FUNCS([socket])
+AC_CHECK_FUNCS([strdup])
+
+
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile man/Makefile])
 

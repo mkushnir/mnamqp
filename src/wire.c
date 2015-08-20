@@ -19,7 +19,7 @@
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
-#include <mrkamqp.h>
+#include "mrkamqp_private.h"
 
 #include "diag.h"
 
@@ -299,9 +299,9 @@ pack_longstr(bytestream_t *bs, bytes_t *s)
         char c;
     } u;
 
-    u.sz = (uint32_t)s->sz;
+    u.sz = htobe32((uint32_t)s->sz);
     (void)bytestream_cat(bs, sizeof(uint32_t), &u.c);
-    (void)bytestream_cat(bs, u.sz, (char *)s->data);
+    (void)bytestream_cat(bs, s->sz, (char *)s->data);
 }
 
 
@@ -385,20 +385,16 @@ table_item_fini(bytes_t *key, amqp_value_t *value)
 }
 
 static int
-pack_table_cb(UNUSED dict_t *dict,
-              bytes_t *key,
+pack_table_cb( bytes_t *key,
               amqp_value_t *value,
               void *udata)
 {
     struct {
         bytestream_t *bs;
-        size_t sz;
     } *params = udata;
 
     pack_shortstr(params->bs, key);
-    params->sz += sizeof(uint8_t) + key->sz - 1;
     pack_field_value(params->bs, value);
-    params->sz += value->ty->len(value);
     return 0;
 }
 
@@ -408,23 +404,178 @@ pack_table(bytestream_t *bs, dict_t *v)
 {
     struct {
         bytestream_t *bs;
-        size_t sz;
     } params;
-    off_t seod;
+    off_t seod0, seod1;
     union {
         uint32_t *i;
         char *c;
     } u;
 
     params.bs = bs;
-    params.sz = 0;
-    seod = SEOD(bs);
+    seod0 = SEOD(bs);
     pack_long(bs, 0); // placeholder
+    seod1 = SEOD(bs);
     (void)dict_traverse(v,
                         (dict_traverser_t)pack_table_cb,
                         &params);
-    u.c = SDATA(bs, seod);
-    *u.i = htobe32((uint32_t)params.sz);
+    u.c = SDATA(bs, seod0);
+    *u.i = htobe32((uint32_t)SEOD(bs) - seod1);
+}
+
+
+void
+init_table(dict_t *v)
+{
+    dict_init(v, 17,
+             (dict_hashfn_t)bytes_hash,
+             (dict_item_comparator_t)bytes_cmp,
+             (dict_item_finalizer_t)table_item_fini);
+
+}
+
+
+#define TABLE_ADD_DEF(n, ty_, tag, vname)                      \
+TABLE_ADD_REF(n, ty_)                                          \
+{                                                              \
+    bytes_t *k;                                                \
+    k = bytes_new_from_str(key);                               \
+    if (dict_get_item(v, k) != NULL) {                         \
+        BYTES_DECREF(&k);                                      \
+        return 1;                                              \
+    } else {                                                   \
+        amqp_value_t *vv;                                      \
+                                                               \
+        if ((vv = malloc(sizeof(amqp_value_t))) == NULL) {     \
+            FAIL("malloc");                                    \
+        }                                                      \
+        vv->ty = amqp_type_by_tag(tag);                        \
+        vv->value.vname = val;                                 \
+        dict_set_item(v, k, vv);                               \
+    }                                                          \
+    return 0;                                                  \
+}                                                              \
+
+/*
+ * quick add some scalars to table
+ */
+TABLE_ADD_DEF(bool, char, AMQP_TBOOL, b)
+TABLE_ADD_DEF(i8, int8_t, AMQP_TINT8, i8)
+TABLE_ADD_DEF(u8, uint8_t, AMQP_TUINT8, u8)
+TABLE_ADD_DEF(i16, int16_t, AMQP_TINT16, i16)
+TABLE_ADD_DEF(u16, uint16_t, AMQP_TUINT16, u16)
+TABLE_ADD_DEF(i32, int32_t, AMQP_TINT32, i32)
+TABLE_ADD_DEF(u32, uint32_t, AMQP_TUINT32, u32)
+TABLE_ADD_DEF(i64, int64_t, AMQP_TINT64, i64)
+TABLE_ADD_DEF(u64, uint64_t, AMQP_TUINT64, u64)
+TABLE_ADD_DEF(float, float, AMQP_TFLOAT, f)
+TABLE_ADD_DEF(double, double, AMQP_TDOUBLE, d)
+TABLE_ADD_DEF(sstr, bytes_t *, AMQP_TSSTR, str)
+TABLE_ADD_DEF(lstr, bytes_t *, AMQP_TLSTR, str)
+
+
+int
+table_add_value(dict_t *v, const char *key, amqp_value_t *val)
+{
+    bytes_t *k;
+
+    k = bytes_new_from_str(key);
+
+    if (dict_get_item(v, k) != NULL) {
+        BYTES_DECREF(&k);
+        return 1;
+    } else {
+        dict_set_item(v, k, val);
+    }
+    return 0;
+}
+
+
+static int
+table_str_cb(bytes_t *key, amqp_value_t *val, bytestream_t *bs)
+{
+    bytestream_nprintf(bs, 1024, "%s=", key->data);
+    switch (val->ty->tag) {
+    case AMQP_TBOOL:
+        (void)bytestream_nprintf(bs, 1024, "%s ", val->value.b ? "#t" : "#f");
+        break;
+
+    case AMQP_TINT8:
+        (void)bytestream_nprintf(bs, 1024, "%hhd ", val->value.i8);
+        break;
+
+    case AMQP_TUINT8:
+        (void)bytestream_nprintf(bs, 1024, "0x%02hhx ", val->value.u8);
+        break;
+
+    case AMQP_TINT16:
+        (void)bytestream_nprintf(bs, 1024, "%hd ", val->value.i16);
+        break;
+
+    case AMQP_TUINT16:
+        (void)bytestream_nprintf(bs, 1024, "0x%04hx ", val->value.u16);
+        break;
+
+    case AMQP_TINT32:
+        (void)bytestream_nprintf(bs, 1024, "%d ", val->value.i32);
+        break;
+
+    case AMQP_TUINT32:
+        (void)bytestream_nprintf(bs, 1024, "0x%08x ", val->value.u32);
+        break;
+
+    case AMQP_TINT64:
+        (void)bytestream_nprintf(bs, 1024, "%ld ", val->value.i64);
+        break;
+
+    case AMQP_TUINT64:
+        (void)bytestream_nprintf(bs, 1024, "0x%016lx ", val->value.u64);
+        break;
+
+    case AMQP_TFLOAT:
+        (void)bytestream_nprintf(bs, 1024, "%f ", val->value.f);
+        break;
+
+    case AMQP_TDOUBLE:
+        (void)bytestream_nprintf(bs, 1024, "%d ", val->value.d);
+        break;
+
+    case AMQP_TSSTR:
+    case AMQP_TLSTR:
+        if (val->value.str != NULL) {
+            (void)bytestream_nprintf(bs,
+                               1024,
+                               "'%s' ",
+                               val->value.str->data);
+        } else {
+            (void)bytestream_nprintf(bs,
+                               1024,
+                               "%s ",
+                               NULL);
+        }
+        break;
+
+    case AMQP_TTABLE:
+        table_str(&val->value.t, bs);
+        break;
+
+    default:
+        (void)bytestream_nprintf(bs, 1024, "... ");
+    }
+    return 0;
+}
+
+void
+table_str(dict_t *v, bytestream_t *bs)
+{
+    off_t eod;
+
+    bytestream_cat(bs, 1, "{");
+    eod = SEOD(bs);
+    dict_traverse(v, (dict_traverser_t)table_str_cb, bs);
+    if (eod < SEOD(bs)) {
+        SADVANCEEOD(bs, -1);
+    }
+    bytestream_cat(bs, 2, "} ");
 }
 
 
@@ -438,18 +589,10 @@ unpack_table(bytestream_t *bs, int fd, dict_t *v)
         TRRET(UNPACK_ECONSUME);
     }
 
-    dict_init(v, 17,
-             (dict_hashfn_t)bytes_hash,
-             (dict_item_comparator_t)bytes_cmp,
-             (dict_item_finalizer_t)table_item_fini);
+    init_table(v);
 
-    //while (SAVAIL(bs) < (ssize_t)sz) {
-    //    if (bytestream_consume_data(bs, fd) != 0) {
-    //        TRRET(UNPACK_ECONSUME);
-    //    }
-    //}
-
-    for (nread = 0; nread <= sz;) {
+    nread = 0;
+    while (nread < sz) {
         ssize_t n;
         bytes_t *key;
         amqp_value_t *value;
@@ -475,6 +618,9 @@ unpack_table(bytestream_t *bs, int fd, dict_t *v)
         } else {
             dict_set_item(v, key, value);
         }
+        //if (nread >= sz) {
+        //    break;
+        //}
     }
 
     assert(nread == sz);
@@ -570,13 +716,6 @@ dec_bool(amqp_value_t *v, bytestream_t *bs, int fd)
 /*
  * int8
  */
-static size_t
-len_i8(UNUSED amqp_value_t *v)
-{
-    return 2 * sizeof(uint8_t);
-}
-
-
 static void
 enc_int8(amqp_value_t *v, bytestream_t *bs)
 {
@@ -642,13 +781,6 @@ dec_uint16(amqp_value_t *v, bytestream_t *bs, int fd)
 }
 
 
-static size_t
-len_i16(UNUSED amqp_value_t *v)
-{
-    return sizeof(uint8_t) + sizeof(uint16_t);
-}
-
-
 /*
  * int32
  */
@@ -663,13 +795,6 @@ static ssize_t
 dec_int32(amqp_value_t *v, bytestream_t *bs, int fd)
 {
     return unpack_long(bs, fd, (uint32_t *)&v->value.i32);
-}
-
-
-static size_t
-len_i32(UNUSED amqp_value_t *v)
-{
-    return sizeof(uint8_t) + sizeof(uint32_t);
 }
 
 
@@ -707,13 +832,6 @@ dec_int64(amqp_value_t *v, bytestream_t *bs, int fd)
 }
 
 
-static size_t
-len_i64(UNUSED amqp_value_t *v)
-{
-    return sizeof(uint8_t) + sizeof(uint64_t);
-}
-
-
 /*
  * uint64
  */
@@ -748,13 +866,6 @@ dec_float(amqp_value_t *v, bytestream_t *bs, int fd)
 }
 
 
-static size_t
-len_float(UNUSED amqp_value_t *v)
-{
-    return sizeof(uint8_t) + sizeof(float);
-}
-
-
 /*
  * double
  */
@@ -769,13 +880,6 @@ static ssize_t
 dec_double(amqp_value_t *v, bytestream_t *bs, int fd)
 {
     return unpack_double(bs, fd, &v->value.d);
-}
-
-
-static size_t
-len_double(UNUSED amqp_value_t *v)
-{
-    return sizeof(uint8_t) + sizeof(double);
 }
 
 
@@ -806,13 +910,6 @@ dec_decimal(amqp_value_t *v, bytestream_t *bs, int fd)
 }
 
 
-static size_t
-len_decimal(UNUSED amqp_value_t *v)
-{
-    return sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint32_t);
-}
-
-
 /*
  * sstr
  */
@@ -830,16 +927,6 @@ dec_sstr(amqp_value_t *v, bytestream_t *bs, int fd)
 }
 
 
-static size_t
-len_sstr(amqp_value_t *v)
-{
-    /*
-     * compansate terminating zero, see unpack_shortstr()
-     */
-    return sizeof(uint8_t) + sizeof(uint8_t) + v->value.str->sz - 1;
-}
-
-
 /*
  * lstr
  */
@@ -854,13 +941,6 @@ static ssize_t
 dec_lstr(amqp_value_t *v, bytestream_t *bs, int fd)
 {
     return unpack_longstr(bs, fd, &v->value.str);
-}
-
-
-static size_t
-len_lstr(amqp_value_t *v)
-{
-    return sizeof(uint8_t) + sizeof(uint32_t) + v->value.str->sz;
 }
 
 
@@ -884,25 +964,6 @@ static ssize_t
 dec_array(amqp_value_t *v, bytestream_t *bs, int fd)
 {
     return unpack_array(bs, fd, &v->value.a);
-}
-
-
-static int
-len_array_cb(amqp_value_t **v, size_t *sz)
-{
-    *sz += (*v)->ty->len(*v);
-    return 0;
-}
-
-
-static size_t
-len_array(amqp_value_t *v)
-{
-    size_t sz;
-
-    sz = 0;
-    array_traverse(&v->value.a, (array_traverser_t)len_array_cb, &sz);
-    return sizeof(uint8_t) + sizeof(uint32_t) + sz;
 }
 
 
@@ -930,25 +991,6 @@ dec_table(amqp_value_t *v, bytestream_t *bs, int fd)
 }
 
 
-static int
-len_table_cb(amqp_value_t *key, amqp_value_t *val, size_t *sz)
-{
-    (*sz) += key->ty->len(key) + val->ty->len(val);
-    return 0;
-}
-
-
-static size_t
-len_table(amqp_value_t *v)
-{
-    size_t sz;
-
-    sz = 0;
-    dict_traverse(&v->value.t, (dict_traverser_t)len_table_cb, &sz);
-    return sizeof(uint8_t) + sizeof(uint32_t) + sz;
-}
-
-
 static void
 kill_table(amqp_value_t *v)
 {
@@ -973,38 +1015,30 @@ dec_void(UNUSED amqp_value_t *v, UNUSED bytestream_t *bs, UNUSED int fd)
 }
 
 
-static size_t
-len_void(UNUSED amqp_value_t *v)
-{
-    return sizeof(uint8_t);
-}
-
-
 static struct {
     char tag;
     amqp_encode enc;
     amqp_decode dec;
-    amqp_len len;
     amqp_kill kill;
 } _typeinfo[] = {
-    {AMQP_TBOOL, enc_bool, dec_bool, len_i8, NULL},
-    {AMQP_TINT8, enc_int8, dec_int8, len_i8, NULL},
-    {AMQP_TUINT8, enc_uint8, dec_uint8, len_i8, NULL},
-    {AMQP_TINT16, enc_int16, dec_int16, len_i16, NULL},
-    {AMQP_TUINT16, enc_uint16, dec_uint16, len_i16, NULL},
-    {AMQP_TINT32, enc_int32, dec_int32, len_i32, NULL},
-    {AMQP_TUINT32, enc_uint32, dec_uint32, len_i32, NULL},
-    {AMQP_TINT64, enc_int64, dec_int64, len_i64, NULL},
-    {AMQP_TUINT64, enc_uint64, dec_uint64, len_i64, NULL},
-    {AMQP_TFLOAT, enc_float, dec_float, len_float, NULL},
-    {AMQP_TDOUBLE, enc_double, dec_double, len_double, NULL},
-    {AMQP_TDECIMAL, enc_decimal, dec_decimal, len_decimal, NULL},
-    {AMQP_TSSTR, enc_sstr, dec_sstr, len_sstr, kill_str},
-    {AMQP_TLSTR, enc_lstr, dec_lstr, len_lstr, kill_str},
-    {AMQP_TARRAY, enc_array, dec_array, len_array, kill_array},
-    {AMQP_TTSTAMP, enc_int64, dec_int64, len_i64, NULL},
-    {AMQP_TTABLE, enc_table, dec_table, len_table, kill_table},
-    {AMQP_TVOID, enc_void, dec_void, len_void, NULL},
+    {AMQP_TBOOL, enc_bool, dec_bool, NULL},
+    {AMQP_TINT8, enc_int8, dec_int8, NULL},
+    {AMQP_TUINT8, enc_uint8, dec_uint8, NULL},
+    {AMQP_TINT16, enc_int16, dec_int16, NULL},
+    {AMQP_TUINT16, enc_uint16, dec_uint16, NULL},
+    {AMQP_TINT32, enc_int32, dec_int32, NULL},
+    {AMQP_TUINT32, enc_uint32, dec_uint32, NULL},
+    {AMQP_TINT64, enc_int64, dec_int64, NULL},
+    {AMQP_TUINT64, enc_uint64, dec_uint64, NULL},
+    {AMQP_TFLOAT, enc_float, dec_float, NULL},
+    {AMQP_TDOUBLE, enc_double, dec_double, NULL},
+    {AMQP_TDECIMAL, enc_decimal, dec_decimal, NULL},
+    {AMQP_TSSTR, enc_sstr, dec_sstr, kill_str},
+    {AMQP_TLSTR, enc_lstr, dec_lstr, kill_str},
+    {AMQP_TARRAY, enc_array, dec_array, kill_array},
+    {AMQP_TTSTAMP, enc_int64, dec_int64, NULL},
+    {AMQP_TTABLE, enc_table, dec_table, kill_table},
+    {AMQP_TVOID, enc_void, dec_void, NULL},
 };
 
 
@@ -1034,6 +1068,19 @@ amqp_decode_table(bytestream_t *bs, int fd, amqp_value_t **v)
 }
 
 
+amqp_value_t *
+amqp_value_new(uint8_t tag)
+{
+    amqp_value_t *res;
+
+    if ((res = malloc(sizeof(amqp_value_t))) == NULL) {
+        FAIL("malloc");
+    }
+    res->ty = amqp_type_by_tag(tag);
+
+    return res;
+}
+
 void
 amqp_value_destroy(amqp_value_t **v)
 {
@@ -1045,6 +1092,7 @@ amqp_value_destroy(amqp_value_t **v)
         *v = NULL;
     }
 }
+
 
 void
 mrkamqp_init(void)
@@ -1058,12 +1106,13 @@ mrkamqp_init(void)
         ty->tag = _typeinfo[i].tag;
         ty->enc = _typeinfo[i].enc;
         ty->dec = _typeinfo[i].dec;
-        ty->len = _typeinfo[i].len;
     }
+    amqp_spec_init();
 }
 
 
 void
 mrkamqp_fini(void)
 {
+    amqp_spec_fini();
 }
