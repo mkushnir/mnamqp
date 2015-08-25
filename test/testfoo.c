@@ -34,11 +34,39 @@ test0(void)
 
 
 UNUSED static int
+mypub(UNUSED int argc, void **argv)
+{
+    amqp_channel_t *chan;
+
+    assert(argc == 1);
+    chan = argv[0];
+
+    while (1) {
+        char buf[1024];
+
+        mrkthr_sleep(15000);
+        snprintf(buf, sizeof(buf), "data %ld", mrkthr_get_now());
+        TRACEC("%s", buf);
+        //if (amqp_channel_publish(chan,
+        //                         "",
+        //                         "qwe",
+        //                         0,
+        //                         buf,
+        //                         strlen(buf)) != 0) {
+        //    break;
+        //}
+    }
+    CTRACE("Exiting mypub...");
+    return 0;
+}
+
+
+UNUSED static int
 cons_thread_worker(UNUSED int argc, void **argv)
 {
-    assert(argc == 1);
     amqp_consumer_t *cons;
 
+    assert(argc == 1);
     cons = argv[0];
 
     CTRACE("consumer %s listening ...", cons->consumer_tag->data);
@@ -109,6 +137,7 @@ run(UNUSED int argc, UNUSED void **argv)
                          "guest",
                          "/",
                          0,
+                         0,
                          0);
 
     if (amqp_conn_open(conn) != 0) {
@@ -126,10 +155,10 @@ run(UNUSED int argc, UNUSED void **argv)
         goto err;
     }
 
-    //if (amqp_channel_confirm(chan, 0) != 0) {
-    //    res = 1;
-    //    goto err;
-    //}
+    if (amqp_channel_confirm(chan, 0) != 0) {
+        res = 1;
+        goto err;
+    }
 
     //if (amqp_channel_declare_exchange(chan, "qwe", "direct", DECLARE_EXCHANGE_FPASSIVE) != 0) {
     //    res = 1;
@@ -160,24 +189,28 @@ run(UNUSED int argc, UNUSED void **argv)
         goto err;
     }
 
-    if ((cons = amqp_channel_create_consumer(chan, "qwe", NULL)) == NULL) {
+    if ((cons = amqp_channel_create_consumer(chan,
+                                             "qwe",
+                                             NULL,
+                                             CONSUME_FNOACK & 0)) == NULL) {
         res = 1;
         goto err;
     }
 
+    mrkthr_spawn("pub", mypub, 1, chan);
+
     amqp_consumer_handle_content(cons, my_content_cb, NULL);
-
-    //cons_thread = mrkthr_spawn("cons", cons_thread_worker, 1, cons);
-
-    //mrkthr_join(cons_thread);
+    CTRACE();
 
     if (amqp_close_consumer(cons)) {
     }
+    CTRACE();
 
     if (amqp_close_channel(chan) != 0) {
         res = 1;
         goto err;
     }
+    CTRACE();
 
 end:
     amqp_conn_close(conn);

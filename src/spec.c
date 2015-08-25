@@ -1508,7 +1508,7 @@ method_info_cmp(amqp_meth_id_t a, amqp_meth_id_t b)
  * header
  */
 
-static amqp_header_t *
+amqp_header_t *
 amqp_header_new(void)
 {
     amqp_header_t *header;
@@ -1610,9 +1610,21 @@ amqp_header_destroy(amqp_header_t **header)
 }                                                              \
 
 
+#define FHPACK(f, ty, n) if (m->flags & AMQP_HEADER_F##f)      \
+{                                                              \
+    FPACK(ty, n);                                              \
+}                                                              \
+
+
+#define FHPACKA(f, ty, n) if (m->flags & AMQP_HEADER_F##f)     \
+{                                                              \
+    FPACKA(ty, n);                                             \
+}                                                              \
+
+
 int
-amqp_header_decode(struct _amqp_conn *conn,
-                       amqp_header_t **header)
+amqp_header_dec(struct _amqp_conn *conn,
+                   amqp_header_t **header)
 {
     amqp_header_t *m;
 
@@ -1639,6 +1651,33 @@ amqp_header_decode(struct _amqp_conn *conn,
     FHUNPACK(CLUSTER_ID, shortstr, cluster_id);
 
     *header = m;
+    return 0;
+}
+
+
+int
+amqp_header_enc(amqp_header_t *m, struct _amqp_conn *conn)
+{
+    FPACK(short, class_id);
+    FPACK(short, weight);
+    FPACK(longlong, body_size);
+    FPACK(short, flags);
+
+    FHPACK(CONTENT_TYPE, shortstr, content_type);
+    FHPACK(CONTENT_ENCODING, shortstr, content_encoding);
+    FHPACKA(HEADERS, table, headers);
+    FHPACK(DELIVERY_MODE, octet, delivery_mode);
+    FHPACK(PRIORITY, octet, priority);
+    FHPACK(CORRELATION_ID, shortstr, correlation_id);
+    FHPACK(REPLY_TO, shortstr, reply_to);
+    FHPACK(EXPIRATION, shortstr, expiration);
+    FHPACK(MESSAGE_ID, shortstr, message_id);
+    FHPACK(TIMESTAMP, longlong, timestamp);
+    FHPACK(TYPE, shortstr, type);
+    FHPACK(USER_ID, shortstr, user_id);
+    FHPACK(APP_ID, shortstr, app_id);
+    FHPACK(CLUSTER_ID, shortstr, cluster_id);
+
     return 0;
 }
 

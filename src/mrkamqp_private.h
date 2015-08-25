@@ -85,12 +85,12 @@ struct _amqp_meth_params;
 struct _amqp_header;
 
 typedef struct _amqp_frame {
+    STQUEUE_ENTRY(_amqp_frame, link);
     union {
         struct _amqp_meth_params *params;
         struct _amqp_header *header;
         char *body;
     } payload;
-    STQUEUE_ENTRY(_amqp_frame, link);
     uint32_t sz;
     uint16_t chan;
     uint8_t type;
@@ -749,6 +749,7 @@ NEWDECL(connection_start_ok);
 NEWDECL(connection_tune_ok);
 NEWDECL(connection_open);
 NEWDECL(connection_close);
+NEWDECL(connection_close_ok);
 NEWDECL(channel_open);
 NEWDECL(channel_close);
 NEWDECL(confirm_select);
@@ -762,6 +763,7 @@ NEWDECL(queue_delete);
 NEWDECL(basic_qos);
 NEWDECL(basic_consume);
 NEWDECL(basic_cancel);
+NEWDECL(basic_publish);
 NEWDECL(basic_deliver);
 NEWDECL(basic_ack);
 
@@ -779,8 +781,9 @@ void amqp_meth_params_destroy(amqp_meth_params_t **);
 /*
  * header API
  */
-int amqp_header_decode(struct _amqp_conn *,
-                       amqp_header_t **);
+int amqp_header_dec(struct _amqp_conn *, amqp_header_t **);
+int amqp_header_enc(amqp_header_t *, struct _amqp_conn *);
+amqp_header_t *amqp_header_new(void);
 void amqp_header_destroy(amqp_header_t **);
 void amqp_header_dump(amqp_header_t *);
 

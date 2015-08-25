@@ -21,27 +21,41 @@ typedef struct _amqp_conn {
     char *user;
     char *password;
     char *vhost;
-    int heartbeat;
-    int frame_max;
+    uint16_t channel_max;
+    uint32_t frame_max;
+    uint16_t heartbeat;
     uint64_t since_last_frame;
 
     int fd;
     bytestream_t ins;
     bytestream_t outs;
     mrkthr_ctx_t *recv_thread;
+    mrkthr_ctx_t *send_thread;
+    /* outgoing frames */
+    STQUEUE(_amqp_frame, oframes);
+    mrkthr_signal_t oframe_sig;
 
     array_t channels;
     struct _amqp_channel *chan0;
 } amqp_conn_t;
 
 
+typedef struct _amqp_pending_ack {
+    STQUEUE_ENTRY(_amqp_pending_ack, link);
+    mrkthr_signal_t sig;
+    uint64_t publish_tag;
+} amqp_pending_ack_t;
+
 struct _amqp_consumer;
 typedef struct _amqp_channel {
     amqp_conn_t *conn;
-    STQUEUE(_amqp_frame, frames);
-    mrkthr_signal_t recvsig;
+    /* incoming frames */
+    STQUEUE(_amqp_frame, iframes);
+    mrkthr_signal_t iframe_sig;
     dict_t consumers;
     struct _amqp_consumer *content_consumer;
+    uint64_t publish_tag;
+    STQUEUE(_amqp_pending_ack, pending_ack);
     int id;
     int confirm_mode:1;
     int closed:1;
@@ -58,10 +72,11 @@ typedef struct _amqp_consumer {
     amqp_frame_t *content_method;
     amqp_frame_t *content_header;
     STQUEUE(_amqp_frame, content_body);
-    mrkthr_signal_t recvsig;
+    mrkthr_signal_t content_sig;
     mrkthr_ctx_t *content_thread;
     amqp_consumer_content_cb_t content_cb;
     void *content_udata;
+    uint8_t flags;
     int closed:1;
 } amqp_consumer_t;
 
@@ -74,8 +89,9 @@ amqp_conn_t *amqp_conn_new(const char *,
                            const char *,
                            const char *,
                            const char *,
+                           short,
                            int,
-                           int);
+                           short);
 void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
 int amqp_conn_run(amqp_conn_t *);
@@ -137,6 +153,7 @@ int amqp_channel_qos(amqp_channel_t *,
                      uint32_t,
                      uint16_t,
                      uint8_t);
+#if 0 // see amqp_channel_create_consumer()
 #define CONSUME_FNOLOCAL                0x01
 #define CONSUME_FNOACK                  0x02
 #define CONSUME_FEXCLUSIVE              0x04
@@ -145,18 +162,34 @@ int amqp_channel_consume(amqp_channel_t *,
                          const char *,
                          const char *,
                          uint8_t);
+#endif
 #define CANCEL_FNOWAIT                  0x01
 int amqp_channel_cancel(amqp_channel_t *,
                         const char *,
                         uint8_t);
 
+#define PUBLISH_MANDATORY               0x01
+#define PUBLISH_IMMEDIATE               0x02
+int amqp_channel_publish(amqp_channel_t *,
+                         const char *,
+                         const char *,
+                         uint8_t,
+                         const char *,
+                         ssize_t);
+
+#define ACK_MULTIPLE                    0x01
 
 /*
  * consumer
  */
+#define CONSUME_FNOLOCAL                0x01
+#define CONSUME_FNOACK                  0x02
+#define CONSUME_FEXCLUSIVE              0x04
+#define CONSUME_FNOWAIT                 0x08
 amqp_consumer_t *amqp_channel_create_consumer(amqp_channel_t *,
                                               const char *,
-                                              const char *);
+                                              const char *,
+                                              uint8_t);
 void amqp_consumer_handle_content(amqp_consumer_t *,
                                   amqp_consumer_content_cb_t,
                                   void *);
