@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <signal.h>
 
 #define TRRET_DEBUG
 #include <mrkcommon/dumpm.h>
@@ -13,6 +14,8 @@
 #ifndef NDEBUG
 const char *_malloc_options = "AJ";
 #endif
+
+static amqp_conn_t *conn = NULL;
 
 static void
 test0(void)
@@ -32,6 +35,24 @@ test0(void)
     }
 }
 
+
+static int
+_shutdown(UNUSED int argc, UNUSED void **argv)
+{
+    amqp_conn_close(conn);
+    amqp_conn_destroy(&conn);
+    mrkamqp_fini();
+    //mrkthr_fini();
+    exit(0);
+    return 0;
+}
+
+
+static void
+myterm(UNUSED int sig)
+{
+    (void)mrkthr_spawn("shutdown_thread", _shutdown, 0);
+}
 
 UNUSED static int
 mypub(UNUSED int argc, void **argv)
@@ -125,7 +146,6 @@ static int
 run(UNUSED int argc, UNUSED void **argv)
 {
     int res;
-    amqp_conn_t *conn;
     amqp_channel_t *chan;
     amqp_consumer_t *cons;
     UNUSED mrkthr_ctx_t *cons_thread;
@@ -200,17 +220,14 @@ run(UNUSED int argc, UNUSED void **argv)
     mrkthr_spawn("pub", mypub, 1, chan);
 
     amqp_consumer_handle_content(cons, my_content_cb, NULL);
-    CTRACE();
 
     if (amqp_close_consumer(cons)) {
     }
-    CTRACE();
 
     if (amqp_close_channel(chan) != 0) {
         res = 1;
         goto err;
     }
-    CTRACE();
 
 end:
     amqp_conn_close(conn);
@@ -242,6 +259,12 @@ test1(void)
 int
 main(void)
 {
+    if (signal(SIGINT, myterm) == SIG_ERR) {
+        return 1;
+    }
+    if (signal(SIGTERM, myterm) == SIG_ERR) {
+        return 1;
+    }
     test0();
     test1();
     return 0;

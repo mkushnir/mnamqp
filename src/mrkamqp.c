@@ -769,6 +769,8 @@ amqp_conn_close(amqp_conn_t *conn)
     res = 0;
     fr0 = NULL;
 
+    assert(conn->chan0 != NULL);
+
     (void)array_traverse(&conn->channels,
                    (array_traverser_t)close_channel_cb, NULL);
 
@@ -894,9 +896,6 @@ channel_expect_method(amqp_channel_t *chan,
                       amqp_meth_id_t mid,
                       amqp_frame_t **fr)
 {
-    assert(chan->iframe_sig.owner == NULL ||
-           chan->iframe_sig.owner == mrkthr_me());
-
     mrkthr_signal_init(&chan->iframe_sig, mrkthr_me());
 
     if (mrkthr_signal_subscribe(&chan->iframe_sig) != 0) {
@@ -965,6 +964,8 @@ amqp_create_channel(amqp_conn_t *conn)
     amqp_frame_t *fr0, *fr1;
     amqp_channel_t *chan;
     amqp_channel_open_t *opn;
+
+    assert(conn->chan0 != NULL);
 
     fr0 = NULL;
     chan = amqp_channel_new(conn);
