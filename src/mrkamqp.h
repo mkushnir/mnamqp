@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 struct _amqp_channel;
+struct _amqp_consumer;
 
 typedef struct _amqp_conn {
     char *host;
@@ -23,6 +24,7 @@ typedef struct _amqp_conn {
     char *vhost;
     uint16_t channel_max;
     uint32_t frame_max;
+    uint32_t payload_max;
     uint16_t heartbeat;
     uint64_t since_last_frame;
 
@@ -37,6 +39,7 @@ typedef struct _amqp_conn {
 
     array_t channels;
     struct _amqp_channel *chan0;
+    int closed:1;
 } amqp_conn_t;
 
 
@@ -47,7 +50,6 @@ typedef struct _amqp_pending_pub {
 } amqp_pending_pub_t;
 
 
-struct _amqp_consumer;
 typedef struct _amqp_channel {
     amqp_conn_t *conn;
     /* incoming frames */

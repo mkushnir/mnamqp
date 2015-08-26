@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <fcntl.h>
 #include <libgen.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -35,6 +36,23 @@ static char *dest = NULL;
 static amqp_conn_t *conn = NULL;
 
 static int shutting_down = 0;
+
+static int
+mymonitor(UNUSED int argc, UNUSED void **argv)
+{
+    while (1) {
+        mrkthr_sleep(1000);
+    }
+    return 0;
+}
+
+
+static void
+myinfo(UNUSED int sig)
+{
+    mrkthr_dump_all_ctxes();
+}
+
 
 static void
 _shutdown(void)
@@ -113,7 +131,9 @@ my_content_cb(UNUSED amqp_frame_t *method,
     //TRACE("---");
     //D8(data, header->payload.header->body_size);
     //TRACE("---");
-    CTRACE("C: %s", data);
+    //CTRACE("C: %s", data);
+    //CTRACE("C: %ld", header->payload.header->body_size);
+    TRACEC("<");
 }
 
 
@@ -128,16 +148,41 @@ traversedir_cb(const char *dir, struct dirent *de, void *udata)
     chan = udata;
 
     if (de != NULL) {
+        struct stat sb;
+        int fd;
+        char *buf;
+
         path = path_join(dir, de->d_name);
-        CTRACE("P: %s", path);
+        if (stat(path, &sb) != 0) {
+            perror("stat");
+            goto end;
+        }
+        //CTRACE("P: %s (%ld)", path, sb.st_size);
+        TRACEC(">");
+
+        if ((fd = open(path, O_RDONLY)) == -1) {
+            perror("open");
+            goto end;
+        }
+
+        if ((buf = malloc(sb.st_size)) == NULL) {
+            FAIL("malloc");
+        }
+
+        if (read(fd, buf, sb.st_size) == -1) {
+            perror("read");
+            goto end;
+        }
         res = amqp_channel_publish(chan,
                                  "",
                                  dest,
                                  0,
-                                 path,
-                                 strlen(path) + 1);
+                                 buf,
+                                 sb.st_size);
         free(path);
+        free(buf);
     }
+end:
     return res;
 }
 
@@ -269,7 +314,7 @@ run_conn(int argc, char **argv)
     }
 
 end:
-    amqp_conn_close(conn);
+    (void)amqp_conn_close(conn);
     amqp_conn_destroy(&conn);
     return res;
 
@@ -302,8 +347,6 @@ run0(UNUSED int argc, void **argv)
         if (run_conn(_argc, _argv) != 0) {
             goto err;
         }
-        CTRACE("breaking run0 loop");
-        break;
 
 err:
         assert(conn == NULL);
@@ -326,6 +369,9 @@ main(int argc, char **argv)
         return 1;
     }
     if (signal(SIGTERM, myterm) == SIG_ERR) {
+        return 1;
+    }
+    if (signal(SIGINFO, myinfo) == SIG_ERR) {
         return 1;
     }
 
@@ -367,6 +413,7 @@ main(int argc, char **argv)
     mrkthr_init();
 
     mrkthr_spawn("run0", run0, 2, argc, argv);
+    mrkthr_spawn("monitor", mymonitor, 0);
 
     mrkthr_loop();
 
