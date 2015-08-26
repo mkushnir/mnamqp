@@ -25,6 +25,9 @@ const char *_malloc_options = "AJ";
 #endif
 
 
+static char *user = "guest";
+static char *password = "guest";
+static char *exchange = "/";
 static char *src = NULL;
 static char *dest = NULL;
 //static char *dir = NULL;
@@ -37,6 +40,7 @@ static void
 _shutdown(void)
 {
     mrkamqp_fini();
+
     {
         char *s[] = {src, dest};
         unsigned i;
@@ -47,6 +51,7 @@ _shutdown(void)
             }
         }
     }
+
     mrkthr_shutdown();
 }
 
@@ -55,11 +60,11 @@ static int
 sigshutdown(UNUSED int argc, UNUSED void **argv)
 {
     if (!shutting_down) {
+        TRACE("Shutting down. Another signal will cause immediate exit.");
         shutting_down = 1;
         amqp_conn_close(conn);
         amqp_conn_destroy(&conn);
         _shutdown();
-        TRACE("Shutting down. Another signal will cause immediate exit.");
     } else {
         TRACE("Exiting (sigshutdown)...");
         exit(0);
@@ -86,22 +91,59 @@ void usage(char *path)
 }
 
 
-static int
-traversedir_cb(const char *dir, struct dirent *de, UNUSED void *udata)
+static void
+declare_queue_cb(UNUSED amqp_channel_t *chan,
+                 amqp_frame_t *fr,
+                 UNUSED void *udata)
 {
-    char *path;
+    amqp_queue_declare_t *m;
 
-    if (de != NULL) {
-        path = path_join(dir, de->d_name);
-        CTRACE("file=%s", path);
-        free(path);
-    }
-    return 0;
+    m = (amqp_queue_declare_t *)fr->payload.params;
+    table_add_i32(&m->arguments, "x-expires", 3600000);
+    table_add_lstr(&m->arguments, "x-ha-policy", bytes_new_from_str("all"));
 }
 
 
-UNUSED static void
-run1(char *path)
+static void
+my_content_cb(UNUSED amqp_frame_t *method,
+              UNUSED amqp_frame_t *header,
+              UNUSED char *data,
+              UNUSED void *udata)
+{
+    //TRACE("---");
+    //D8(data, header->payload.header->body_size);
+    //TRACE("---");
+    CTRACE("C: %s", data);
+}
+
+
+static int
+traversedir_cb(const char *dir, struct dirent *de, void *udata)
+{
+    int res;
+    amqp_channel_t *chan;
+    char *path;
+
+    res = 0;
+    chan = udata;
+
+    if (de != NULL) {
+        path = path_join(dir, de->d_name);
+        CTRACE("P: %s", path);
+        res = amqp_channel_publish(chan,
+                                 "",
+                                 dest,
+                                 0,
+                                 path,
+                                 strlen(path) + 1);
+        free(path);
+    }
+    return res;
+}
+
+
+static void
+mypub1(amqp_channel_t *chan, char *path)
 {
     struct stat sb;
 
@@ -112,7 +154,7 @@ run1(char *path)
     }
 
     if (S_ISDIR(sb.st_mode)) {
-        if (traverse_dir(path, traversedir_cb, NULL) != 0) {
+        if (traverse_dir(path, traversedir_cb, chan) != 0) {
             CTRACE("traverse_dir error");
         }
     } else {
@@ -123,15 +165,126 @@ run1(char *path)
 
 
 static int
+mypub(UNUSED int argc, void **argv)
+{
+    amqp_channel_t *chan;
+    int _argc;
+    char **_argv;
+    int i;
+
+    assert(argc == 3);
+    chan = argv[0];
+    _argc = (intptr_t)argv[1];
+    _argv = argv[2];
+
+    mrkthr_sleep(10000);
+    CTRACE("Starting publishing ...");
+
+    for (i = 0; i < _argc; ++i) {
+        mypub1(chan, _argv[i]);
+    }
+    CTRACE("Exiting mypub...");
+    return 0;
+}
+
+
+static int
+create_conn(void)
+{
+    int res;
+
+    res = 0;
+
+    conn = amqp_conn_new("localhost", 5672, user, password, exchange, 0, 0, 0);
+
+    if (amqp_conn_open(conn) != 0) {
+        res = 1;
+        goto err;
+    }
+
+    if (amqp_conn_run(conn) != 0) {
+        res = 1;
+        goto err;
+    }
+
+end:
+    return res;
+
+err:
+    TR(res);
+    amqp_conn_close(conn);
+    amqp_conn_destroy(&conn);
+    goto end;
+}
+
+static int
+run_conn(int argc, char **argv)
+{
+    int res;
+    amqp_channel_t *chan;
+    amqp_consumer_t *cons;
+
+    res = 0;
+    assert(conn != NULL);
+
+    if ((chan = amqp_create_channel(conn)) == NULL) {
+        res = 1;
+        goto err;
+    }
+
+    //if (amqp_channel_confirm(chan, 0) != 0) {
+    //    res = 1;
+    //    goto err;
+    //}
+
+    if (amqp_channel_declare_queue_ex(chan,
+                                      src,
+                                      DECLARE_QUEUE_FEXCLUSIVE,
+                                      declare_queue_cb,
+                                      NULL) != 0) {
+        res = 1;
+        goto err;
+    }
+
+    if ((cons = amqp_channel_create_consumer(chan,
+                                             src,
+                                             NULL,
+                                             CONSUME_FNOACK)) == NULL) {
+        res = 1;
+        goto err;
+    }
+
+    mrkthr_spawn("pub", mypub, 3, chan, argc, argv);
+
+    amqp_consumer_handle_content(cons, my_content_cb, NULL);
+
+    if (amqp_close_consumer(cons) != 0) {
+        res = 1;
+        goto err;
+    }
+
+    if (amqp_close_channel(chan) != 0) {
+        res = 1;
+        goto err;
+    }
+
+end:
+    amqp_conn_close(conn);
+    amqp_conn_destroy(&conn);
+    return res;
+
+err:
+    TR(res);
+    goto end;
+
+}
+
+static int
 run0(UNUSED int argc, void **argv)
 {
     int res;
     int _argc;
     char **_argv;
-    UNUSED int i;
-
-    UNUSED amqp_channel_t *chan;
-    UNUSED amqp_consumer_t *cons;
 
     assert(argc == 2);
 
@@ -142,75 +295,25 @@ run0(UNUSED int argc, void **argv)
 
     mrkamqp_init();
 
-    conn = amqp_conn_new("localhost",
-                         5672,
-                         "guest",
-                         "guest",
-                         "/",
-                         0,
-                         0,
-                         0);
-
-
-    if (amqp_conn_open(conn) != 0) {
-        res = 1;
-        goto err0;
-    }
-
-    if (amqp_conn_run(conn) != 0) {
-        res = 1;
-        goto err;
-    }
-
-    if ((chan = amqp_create_channel(conn)) == NULL) {
-        res = 1;
-        goto err;
-    }
-
-    if (amqp_channel_confirm(chan, 0) != 0) {
-        res = 1;
-        goto err;
-    }
-
-    while (1) {
-        CTRACE();
-        mrkthr_sleep(2000);
-    }
-
-    //if (amqp_channel_declare_queue_ex(chan,
-    //                                  "qwe",
-    //                                  DECLARE_QUEUE_FEXCLUSIVE,
-    //                                  declare_queue_cb,
-    //                                  NULL) != 0) {
-    //    res = 1;
-    //    goto err;
-    //}
-
-    //if ((cons = amqp_channel_create_consumer(chan,
-    //                                         "qwe",
-    //                                         NULL,
-    //                                         CONSUME_FNOACK & 0)) == NULL) {
-    //    res = 1;
-    //    goto err;
-    //}
-
-    //for (i = 0; i < _argc; ++i) {
-    //    run1(_argv[i]);
-    //}
-
-end:
-    amqp_conn_close(conn);
-end0:
-    amqp_conn_destroy(&conn);
-    return res;
+    while (!shutting_down) {
+        if (create_conn() != 0) {
+            goto err;
+        }
+        if (run_conn(_argc, _argv) != 0) {
+            goto err;
+        }
+        CTRACE("breaking run0 loop");
+        break;
 
 err:
-    TR(res);
-    goto end;
+        assert(conn == NULL);
+        CTRACE("Reconnecting ...");
+        mrkthr_sleep(1000);
+        continue;
+    }
 
-err0:
-    TR(res);
-    goto end0;
+    CTRACE("Exiting run0 ...");
+    return res;
 }
 
 

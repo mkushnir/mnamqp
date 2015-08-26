@@ -40,11 +40,12 @@ typedef struct _amqp_conn {
 } amqp_conn_t;
 
 
-typedef struct _amqp_pending_ack {
-    STQUEUE_ENTRY(_amqp_pending_ack, link);
+typedef struct _amqp_pending_pub {
+    STQUEUE_ENTRY(_amqp_pending_pub, link);
     mrkthr_signal_t sig;
     uint64_t publish_tag;
-} amqp_pending_ack_t;
+} amqp_pending_pub_t;
+
 
 struct _amqp_consumer;
 typedef struct _amqp_channel {
@@ -53,14 +54,22 @@ typedef struct _amqp_channel {
     STQUEUE(_amqp_frame, iframes);
     mrkthr_signal_t iframe_sig;
     dict_t consumers;
+    /* weak ref */
     struct _amqp_consumer *content_consumer;
     uint64_t publish_tag;
-    STQUEUE(_amqp_pending_ack, pending_ack);
+    STQUEUE(_amqp_pending_pub, pending_pub);
     int id;
     int confirm_mode:1;
     int closed:1;
 } amqp_channel_t;
 
+
+typedef struct _amqp_pending_content {
+    STQUEUE_ENTRY(_amqp_pending_content, link);
+    amqp_frame_t *method;
+    amqp_frame_t *header;
+    STQUEUE(_amqp_frame, body);
+} amqp_pending_content_t;
 
 typedef void (*amqp_consumer_content_cb_t)(amqp_frame_t *,
                                            amqp_frame_t *,
@@ -69,9 +78,10 @@ typedef void (*amqp_consumer_content_cb_t)(amqp_frame_t *,
 typedef struct _amqp_consumer {
     amqp_channel_t *chan;
     bytes_t *consumer_tag;
-    amqp_frame_t *content_method;
-    amqp_frame_t *content_header;
-    STQUEUE(_amqp_frame, content_body);
+    //amqp_frame_t *content_method;
+    //amqp_frame_t *content_header;
+    //STQUEUE(_amqp_frame, content_body);
+    STQUEUE(_amqp_pending_content, pending_content);
     mrkthr_signal_t content_sig;
     mrkthr_ctx_t *content_thread;
     amqp_consumer_content_cb_t content_cb;

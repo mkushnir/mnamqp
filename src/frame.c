@@ -33,8 +33,9 @@ amqp_frame_dump(amqp_frame_t *fr)
         } else if (fr->type == AMQP_FHEADER) {
             amqp_header_dump(fr->payload.header);
         } else if (fr->type == AMQP_FBODY) {
-            TRACEC("\n");
-            D8(fr->payload.body, fr->sz);
+            TRACEC("sz=%d", fr->sz);
+            //TRACEC("\n");
+            //D8(fr->payload.body, fr->sz);
         }
     }
     TRACEC("]");
