@@ -332,10 +332,12 @@ next_frame(amqp_conn_t *conn)
                     (*chan)->content_consumer = dit->value;
                     pc = amqp_pending_content_new();
                     pc->method = fr;
-                    STQUEUE_ENQUEUE(&(*chan)->content_consumer->pending_content,
-                                    link,
-                                    pc);
-                    mrkthr_signal_send(&(*chan)->content_consumer->content_sig);
+                    STQUEUE_ENQUEUE(
+                            &(*chan)->content_consumer->pending_content,
+                            link,
+                            pc);
+                    mrkthr_signal_send(
+                            &(*chan)->content_consumer->content_sig);
                 }
 
             } else if (fr->payload.params->mi->mid == AMQP_BASIC_ACK) {
@@ -344,7 +346,8 @@ next_frame(amqp_conn_t *conn)
 
                 m = (amqp_basic_ack_t *)fr->payload.params;
                 if (m->flags & ACK_MULTIPLE) {
-                    while ((pp = STQUEUE_HEAD(&(*chan)->pending_pub)) != NULL) {
+                    while ((pp =
+                            STQUEUE_HEAD(&(*chan)->pending_pub)) != NULL) {
                         STQUEUE_DEQUEUE(&(*chan)->pending_pub, link);
                         STQUEUE_ENTRY_FINI(link, pp);
 
@@ -354,7 +357,8 @@ next_frame(amqp_conn_t *conn)
                             mrkthr_signal_send(&pp->sig);
                             break;
                         } else {
-                            TRACE("got baskc.ack deliver_tag=%ld expected >=%ld",
+                            TRACE("got baskc.ack deliver_tag=%ld "
+                                  "expected >=%ld",
                                   m->delivery_tag, pp->publish_tag);
                             mrkthr_signal_error(&pp->sig, 0x80);
                         }
@@ -439,8 +443,8 @@ next_frame(amqp_conn_t *conn)
                         /*
                          * XXX
                          */
-                        TRACE("duplicate header is not expected during delivery, "
-                              "discarding frame");
+                        TRACE("duplicate header is not expected "
+                              "during delivery, discarding frame");
                         amqp_frame_destroy_header(&fr);
                     } else {
                         uint16_t class_id;
@@ -455,7 +459,8 @@ next_frame(amqp_conn_t *conn)
                             /*
                              * XXX
                              */
-                            CTRACE("got class_id %hd, expected %hd, discarding frame",
+                            CTRACE("got class_id %hd, expected %hd, "
+                                   "discarding frame",
                                    fr->payload.header->class_id, class_id);
                             amqp_frame_destroy_header(&fr);
 
