@@ -37,16 +37,6 @@ static amqp_conn_t *conn = NULL;
 
 static int shutting_down = 0;
 
-static int
-mymonitor(UNUSED int argc, UNUSED void **argv)
-{
-    while (1) {
-        mrkthr_sleep(1000);
-    }
-    return 0;
-}
-
-
 static void
 myinfo(UNUSED int sig)
 {
@@ -413,7 +403,6 @@ main(int argc, char **argv)
     mrkthr_init();
 
     mrkthr_spawn("run0", run0, 2, argc, argv);
-    mrkthr_spawn("monitor", mymonitor, 0);
 
     mrkthr_loop();
 
