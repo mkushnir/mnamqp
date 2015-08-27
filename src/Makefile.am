@@ -15,7 +15,7 @@ nobase_include_HEADERS = mrkamqp_private.h mrkamqp.h
 # have to move mrkamqp_private.h to nobase_include to expose *_ex() API
 #noinst_HEADERS = mrkamqp_private.h
 
-libmrkamqp_la_SOURCES = mrkamqp.c wire.c spec.c frame.c
+libmrkamqp_la_SOURCES = mrkamqp.c wire.c spec.c frame.c rpc.c
 nodist_libmrkamqp_la_SOURCES = diag.c
 
 if DEBUG

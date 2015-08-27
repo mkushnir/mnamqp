@@ -72,6 +72,8 @@ mypub(UNUSED int argc, void **argv)
         //                         "",
         //                         "qwe",
         //                         0,
+        //                         NULL,
+        //                         NULL,
         //                         buf,
         //                         strlen(buf)) != 0) {
         //    break;
@@ -122,15 +124,18 @@ my_content_cb(UNUSED amqp_frame_t *method,
               UNUSED void *udata)
 {
     TRACE("---");
-    D8(data, header->payload.header->body_size);
+    if (data != NULL) {
+        D8(data, header->payload.header->body_size);
+        free(data);
+    }
     TRACE("---");
 }
 
 
 static void
-declare_queue_cb(UNUSED amqp_channel_t *chan,
-                 amqp_frame_t *fr,
-                 UNUSED void *udata)
+declare_queue_cb1(UNUSED amqp_channel_t *chan,
+                  amqp_frame_t *fr,
+                  UNUSED void *udata)
 {
     amqp_queue_declare_t *m;
     //amqp_value_t *args;
@@ -141,6 +146,7 @@ declare_queue_cb(UNUSED amqp_channel_t *chan,
     table_add_i32(&m->arguments, "x-expires", 3600000);
     table_add_lstr(&m->arguments, "x-ha-policy", bytes_new_from_str("all"));
 }
+
 
 static int
 run(UNUSED int argc, UNUSED void **argv)
@@ -203,7 +209,8 @@ run(UNUSED int argc, UNUSED void **argv)
     if (amqp_channel_declare_queue_ex(chan,
                                       "qwe",
                                       DECLARE_QUEUE_FEXCLUSIVE,
-                                      declare_queue_cb,
+                                      declare_queue_cb1,
+                                      NULL,
                                       NULL) != 0) {
         res = 1;
         goto err;

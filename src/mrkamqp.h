@@ -94,6 +94,71 @@ typedef struct _amqp_consumer {
 
 
 /*
+ * header
+ */
+typedef struct _amqp_header {
+    uint16_t class_id;
+    uint16_t weight;
+    uint64_t body_size;
+#define AMQP_HEADER_FCONTENT_TYPE       (1 << 15)
+#define AMQP_HEADER_FCONTENT_ENCODING   (1 << 14)
+#define AMQP_HEADER_FHEADERS            (1 << 13)
+#define AMQP_HEADER_FDELIVERY_MODE      (1 << 12)
+#define AMQP_HEADER_FPRIORITY           (1 << 11)
+#define AMQP_HEADER_FCORRELATION_ID     (1 << 10)
+#define AMQP_HEADER_FREPLY_TO           (1 << 9)
+#define AMQP_HEADER_FEXPIRATION         (1 << 8)
+#define AMQP_HEADER_FMESSAGE_ID         (1 << 7)
+#define AMQP_HEADER_FTIMESTAMP          (1 << 6)
+#define AMQP_HEADER_FTYPE               (1 << 5)
+#define AMQP_HEADER_FUSER_ID            (1 << 4)
+#define AMQP_HEADER_FAPP_ID             (1 << 3)
+#define AMQP_HEADER_FCLUSTER_ID         (1 << 2)
+    uint16_t flags;
+    bytes_t *content_type;
+    bytes_t *content_encoding;
+    dict_t headers;
+    uint8_t delivery_mode;
+    uint8_t priority;
+    bytes_t *correlation_id;
+    bytes_t *reply_to;
+    bytes_t *expiration;
+    bytes_t *message_id;
+    uint64_t timestamp;
+    bytes_t *type;
+    bytes_t *user_id;
+    bytes_t *app_id;
+    bytes_t *cluster_id;
+
+    uint64_t received_size;
+} amqp_header_t;
+
+
+/*
+ * rpc
+ */
+typedef void (*amqp_rpc_server_handler_t)(const amqp_header_t *,
+                                          const char *,
+                                          amqp_header_t **,
+                                          char **,
+                                          void *);
+typedef struct _amqp_rpc {
+    char *exchange;
+    char *routing_key;
+    bytes_t *reply_to;
+    /* weakref */
+    amqp_channel_t *chan;
+    amqp_consumer_t *cons;
+    /* key weakref, value weakref */
+    dict_t calls;
+    uint64_t next_id;
+    amqp_consumer_content_cb_t cb;
+    amqp_rpc_server_handler_t server_handler;
+    void *server_udata;
+} amqp_rpc_t;
+
+
+/*
  * conn
  */
 amqp_conn_t *amqp_conn_new(const char *,
@@ -182,12 +247,23 @@ int amqp_channel_cancel(amqp_channel_t *,
 
 #define PUBLISH_MANDATORY               0x01
 #define PUBLISH_IMMEDIATE               0x02
+typedef void (*amqp_header_completion_cb)(amqp_channel_t *,
+                                          amqp_header_t *,
+                                          void *);
 int amqp_channel_publish(amqp_channel_t *,
                          const char *,
                          const char *,
                          uint8_t,
+                         amqp_header_completion_cb,
+                         void *,
                          const char *,
                          ssize_t);
+int amqp_channel_publish_ex(amqp_channel_t *,
+                            const char *,
+                            const char *,
+                            uint8_t,
+                            amqp_header_t *,
+                            const char *);
 
 #define ACK_MULTIPLE                    0x01
 
@@ -202,15 +278,62 @@ amqp_consumer_t *amqp_channel_create_consumer(amqp_channel_t *,
                                               const char *,
                                               const char *,
                                               uint8_t);
-void amqp_consumer_handle_content(amqp_consumer_t *,
-                                  amqp_consumer_content_cb_t,
-                                  void *);
+int amqp_consumer_handle_content_spawn(amqp_consumer_t *,
+                                       amqp_consumer_content_cb_t,
+                                       void *);
+int amqp_consumer_handle_content(amqp_consumer_t *,
+                                 amqp_consumer_content_cb_t,
+                                 void *);
 amqp_frame_t *amqp_consumer_get_method(amqp_consumer_t *);
 amqp_frame_t *amqp_consumer_get_header(amqp_consumer_t *);
 amqp_frame_t *amqp_consumer_get_body(amqp_consumer_t *);
 void amqp_consumer_reset_content_state(amqp_consumer_t *);
 int amqp_close_consumer(amqp_consumer_t *);
 
+
+/*
+ * header API
+ */
+int amqp_header_dec(struct _amqp_conn *, amqp_header_t **);
+int amqp_header_enc(amqp_header_t *, struct _amqp_conn *);
+amqp_header_t *amqp_header_new(void);
+void amqp_header_destroy(amqp_header_t **);
+void amqp_header_dump(amqp_header_t *);
+
+#define AMQP_HEADER_SET_REF(n) amqp_header_set_##n
+
+#define AMQP_HEADER_SET_DECL(n, ty)                            \
+void AMQP_HEADER_SET_REF(n)(amqp_header_t *header, ty v)       \
+
+AMQP_HEADER_SET_DECL(content_type, bytes_t *);
+AMQP_HEADER_SET_DECL(content_encoding, bytes_t *);
+void amqp_header_set_headers(amqp_header_t *, bytes_t *, amqp_value_t *);
+AMQP_HEADER_SET_DECL(delivery_mode, uint8_t);
+AMQP_HEADER_SET_DECL(priority, uint8_t);
+AMQP_HEADER_SET_DECL(correlation_id, bytes_t *);
+AMQP_HEADER_SET_DECL(reply_to, bytes_t *);
+AMQP_HEADER_SET_DECL(expiration, bytes_t *);
+AMQP_HEADER_SET_DECL(message_id, bytes_t *);
+AMQP_HEADER_SET_DECL(timestamp, uint64_t);
+AMQP_HEADER_SET_DECL(type, bytes_t *);
+AMQP_HEADER_SET_DECL(user_id, bytes_t *);
+AMQP_HEADER_SET_DECL(app_id, bytes_t *);
+AMQP_HEADER_SET_DECL(cluster_id, bytes_t *);
+
+
+/*
+ * rpc
+ */
+amqp_rpc_t *amqp_rpc_new(char *, char *, char *);
+void amqp_rpc_destroy(amqp_rpc_t **);
+int amqp_rpc_setup_client(amqp_rpc_t *, amqp_channel_t *);
+int amqp_rpc_setup_server(amqp_rpc_t *,
+                          amqp_channel_t *,
+                          amqp_rpc_server_handler_t,
+                          void *);
+int amqp_rpc_run(amqp_rpc_t *);
+int amqp_rpc_teardown(amqp_rpc_t *);
+int amqp_rpc_call(amqp_rpc_t *, bytes_t *, char **, size_t *);
 
 /*
  * module

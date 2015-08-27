@@ -4,7 +4,7 @@
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
-#include "mrkamqp_private.h"
+#include <mrkamqp_private.h>
 
 #include "diag.h"
 
@@ -1680,6 +1680,49 @@ amqp_header_enc(amqp_header_t *m, struct _amqp_conn *conn)
 
     return 0;
 }
+
+#define AMQP_HEADER_SET(n, f, ty)                      \
+AMQP_HEADER_SET_DECL(n, ty)                            \
+{                                                      \
+    header->flags |= AMQP_HEADER_F##f;                 \
+    header->n = v;                                     \
+}                                                      \
+
+
+AMQP_HEADER_SET(content_type, CONTENT_TYPE, bytes_t *)
+
+AMQP_HEADER_SET(content_encoding, CONTENT_ENCODING, bytes_t *)
+
+void
+amqp_header_set_headers(amqp_header_t *header,
+                        bytes_t *key,
+                        amqp_value_t *value)
+{
+    header->flags |= AMQP_HEADER_FHEADERS;
+    dict_set_item(&header->headers, key, value);
+}
+
+AMQP_HEADER_SET(delivery_mode, DELIVERY_MODE, uint8_t)
+
+AMQP_HEADER_SET(priority, PRIORITY, uint8_t)
+
+AMQP_HEADER_SET(correlation_id, CORRELATION_ID, bytes_t *)
+
+AMQP_HEADER_SET(reply_to, REPLY_TO, bytes_t *)
+
+AMQP_HEADER_SET(expiration, EXPIRATION, bytes_t *)
+
+AMQP_HEADER_SET(message_id, MESSAGE_ID, bytes_t *)
+
+AMQP_HEADER_SET(timestamp, TIMESTAMP, uint64_t)
+
+AMQP_HEADER_SET(type, TYPE, bytes_t *)
+
+AMQP_HEADER_SET(user_id, USER_ID, bytes_t *)
+
+AMQP_HEADER_SET(app_id, APP_ID, bytes_t *)
+
+AMQP_HEADER_SET(cluster_id, CLUSTER_ID, bytes_t *)
 
 
 void

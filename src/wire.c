@@ -19,7 +19,7 @@
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
-#include "mrkamqp_private.h"
+#include <mrkamqp_private.h>
 
 #include "diag.h"
 

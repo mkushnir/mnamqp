@@ -28,7 +28,7 @@
 #include <mrkcommon/util.h>
 
 #include <mrkthr.h>
-#include "mrkamqp_private.h"
+#include <mrkamqp_private.h>
 
 #include "diag.h"
 
@@ -1120,7 +1120,11 @@ err:
 }
 
 
-#define AMQP_CHANNEL_METHOD_PAIR(mname, okmid, errid, __a1)    \
+#define AMQP_CHANNEL_METHOD_PAIR(mname,                        \
+                                 okmid,                        \
+                                 errid,                        \
+                                 __a1,                         \
+                                 __a0)                         \
     int res;                                                   \
     amqp_frame_t *fr0, *fr1;                                   \
     amqp_##mname##_t *m;                                       \
@@ -1136,6 +1140,7 @@ err:
         res = errid + 1;                                       \
         goto err;                                              \
     }                                                          \
+    __a0                                                       \
 end:                                                           \
     amqp_frame_destroy_method(&fr0);                           \
     return res;                                                \
@@ -1149,7 +1154,8 @@ err:                                                           \
                                         fnowait,               \
                                         okmid,                 \
                                         errid,                 \
-                                        __a1)                  \
+                                        __a1,                  \
+                                        __a0)                  \
     int res;                                                   \
     amqp_frame_t *fr0, *fr1;                                   \
     amqp_##mname##_t *m;                                       \
@@ -1167,6 +1173,7 @@ err:                                                           \
             goto err;                                          \
         }                                                      \
     }                                                          \
+    __a0                                                       \
 end:                                                           \
     amqp_frame_destroy_method(&fr0);                           \
     return res;                                                \
@@ -1185,7 +1192,7 @@ amqp_channel_confirm(amqp_channel_t *chan, uint8_t flags)
                                     AMQP_CCONFIRM,
         m->flags = flags;
         chan->confirm_mode = 1;
-        chan->publish_tag = 0ll;
+        chan->publish_tag = 0ll;,
     )
 }
 
@@ -1204,7 +1211,7 @@ amqp_channel_declare_exchange(amqp_channel_t *chan,
         assert(type != NULL);
         m->exchange = bytes_new_from_str(exchange);
         m->type = bytes_new_from_str(type);
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1214,7 +1221,8 @@ amqp_channel_declare_exchange_ex(amqp_channel_t *chan,
                                  const char *exchange,
                                  const char *type,
                                  uint8_t flags,
-                                 amqp_frame_completion_cb_t cb,
+                                 amqp_frame_completion_cb_t cb1,
+                                 amqp_frame_completion_cb_t cb0,
                                  void *udata)
 {
     AMQP_CHANNEL_METHOD_PAIR_NOWAIT(exchange_declare,
@@ -1226,8 +1234,8 @@ amqp_channel_declare_exchange_ex(amqp_channel_t *chan,
         m->exchange = bytes_new_from_str(exchange);
         m->type = bytes_new_from_str(type);
         m->flags = flags;
-        assert(cb != NULL);
-        cb(chan, fr1, udata);
+        if (cb1 != NULL) cb1(chan, fr1, udata);,
+        if (cb0 != NULL) cb0(chan, fr0, udata);
     )
 }
 
@@ -1246,7 +1254,7 @@ amqp_channel_delete_exchange(amqp_channel_t *chan,
                                     AMQP_DELETE_EXCHANGE,
         assert(exchange != NULL);
         m->exchange = bytes_new_from_str(exchange);
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1262,7 +1270,7 @@ amqp_channel_declare_queue(amqp_channel_t *chan,
                                     AMQP_DECLARE_QUEUE,
         assert(queue != NULL);
         m->queue = bytes_new_from_str(queue);
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1271,7 +1279,8 @@ int
 amqp_channel_declare_queue_ex(amqp_channel_t *chan,
                               const char *queue,
                               uint8_t flags,
-                              amqp_frame_completion_cb_t cb,
+                              amqp_frame_completion_cb_t cb1,
+                              amqp_frame_completion_cb_t cb0,
                               void *udata)
 {
     AMQP_CHANNEL_METHOD_PAIR_NOWAIT(queue_declare,
@@ -1281,8 +1290,8 @@ amqp_channel_declare_queue_ex(amqp_channel_t *chan,
         assert(queue != NULL);
         m->queue = bytes_new_from_str(queue);
         m->flags = flags;
-        assert(cb != NULL);
-        cb(chan, fr1, udata);
+        if (cb1 != NULL) cb1(chan, fr1, udata);,
+        if (cb0 != NULL) cb0(chan, fr0, udata);
     )
 }
 
@@ -1304,7 +1313,7 @@ amqp_channel_bind_queue(amqp_channel_t *chan,
         m->queue = bytes_new_from_str(queue);
         m->exchange = bytes_new_from_str(exchange);
         m->routing_key = bytes_new_from_str(routing_key);
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1315,7 +1324,8 @@ amqp_channel_bind_queue_ex(amqp_channel_t *chan,
                            const char *exchange,
                            const char *routing_key,
                            uint8_t flags,
-                           amqp_frame_completion_cb_t cb,
+                           amqp_frame_completion_cb_t cb1,
+                           amqp_frame_completion_cb_t cb0,
                            void *udata)
 {
     AMQP_CHANNEL_METHOD_PAIR_NOWAIT(queue_bind,
@@ -1329,8 +1339,8 @@ amqp_channel_bind_queue_ex(amqp_channel_t *chan,
         m->exchange = bytes_new_from_str(exchange);
         m->routing_key = bytes_new_from_str(routing_key);
         m->flags = flags;
-        assert(cb != NULL);
-        cb(chan, fr1, udata);
+        if (cb1 != NULL) cb1(chan, fr1, udata);,
+        if (cb0 != NULL) cb0(chan, fr0, udata);
     )
 }
 
@@ -1349,7 +1359,7 @@ amqp_channel_unbind_queue(amqp_channel_t *chan,
         assert(routing_key != NULL);
         m->queue = bytes_new_from_str(queue);
         m->exchange = bytes_new_from_str(exchange);
-        m->routing_key = bytes_new_from_str(routing_key);
+        m->routing_key = bytes_new_from_str(routing_key);,
     )
 }
 
@@ -1359,7 +1369,8 @@ amqp_channel_unbind_queue_ex(amqp_channel_t *chan,
                              const char *queue,
                              const char *exchange,
                              const char *routing_key,
-                             amqp_frame_completion_cb_t cb,
+                             amqp_frame_completion_cb_t cb1,
+                             amqp_frame_completion_cb_t cb0,
                              void *udata)
 {
     AMQP_CHANNEL_METHOD_PAIR(queue_unbind,
@@ -1371,8 +1382,8 @@ amqp_channel_unbind_queue_ex(amqp_channel_t *chan,
         m->queue = bytes_new_from_str(queue);
         m->exchange = bytes_new_from_str(exchange);
         m->routing_key = bytes_new_from_str(routing_key);
-        assert(cb != NULL);
-        cb(chan, fr1, udata);
+        if (cb1 != NULL) cb1(chan, fr1, udata);,
+        if (cb0 != NULL) cb0(chan, fr0, udata);
     )
 }
 
@@ -1388,7 +1399,7 @@ amqp_channel_purge_queue(amqp_channel_t *chan,
                                     AMQP_PURGE_QUEUE,
         assert(queue != NULL);
         m->queue = bytes_new_from_str(queue);
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1404,7 +1415,7 @@ amqp_channel_delete_queue(amqp_channel_t *chan,
                                     AMQP_DELETE_QUEUE,
         assert(queue != NULL);
         m->queue = bytes_new_from_str(queue);
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1420,7 +1431,7 @@ amqp_channel_qos(amqp_channel_t *chan,
                              AMQP_QOS,
         m->prefetch_size = prefetch_size;
         m->prefetch_count = prefetch_count;
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1430,6 +1441,8 @@ amqp_channel_publish(amqp_channel_t *chan,
                      const char *exchange,
                      const char *routing_key,
                      uint8_t flags,
+                     amqp_header_completion_cb cb,
+                     void *udata,
                      const char *data,
                      ssize_t sz)
 {
@@ -1440,6 +1453,9 @@ amqp_channel_publish(amqp_channel_t *chan,
     amqp_pending_pub_t pp;
 
     res = 0;
+
+    assert(routing_key != NULL);
+    assert(exchange != NULL);
 
     STQUEUE_ENTRY_INIT(link, &pp);
     mrkthr_signal_init(&pp.sig, mrkthr_me());
@@ -1455,10 +1471,83 @@ amqp_channel_publish(amqp_channel_t *chan,
 
     fr1 = amqp_frame_new(chan->id, AMQP_FHEADER);
     h = amqp_header_new();
-    h->delivery_mode = 2;
     h->class_id = AMQP_BASIC;
     h->body_size = sz;
+    if (cb != NULL) {
+        cb(chan, h, udata);
+    }
     fr1->payload.header = h;
+    channel_send_frame(chan, fr1);
+
+    while (sz > chan->conn->payload_max) {
+        fr1 = amqp_frame_new(chan->id, AMQP_FBODY);
+        fr1->sz = chan->conn->payload_max;
+        if ((fr1->payload.body = malloc(chan->conn->payload_max)) == NULL) {
+            FAIL("malloc");
+        }
+        memcpy(fr1->payload.body, data, chan->conn->payload_max);
+        channel_send_frame(chan, fr1);
+
+        data += chan->conn->payload_max;
+        sz -= chan->conn->payload_max;
+    }
+    if (sz > 0) {
+        fr1 = amqp_frame_new(chan->id, AMQP_FBODY);
+        fr1->sz = sz;
+        if ((fr1->payload.body = malloc(sz)) == NULL) {
+            FAIL("malloc");
+        }
+        memcpy(fr1->payload.body, data, sz);
+        channel_send_frame(chan, fr1);
+    }
+    fr1 = NULL;
+
+    if (chan->confirm_mode) {
+        STQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
+        if (mrkthr_signal_subscribe(&pp.sig) != 0) {
+            res = CHANNEL_PUBLISH + 1;
+        }
+    }
+
+    mrkthr_signal_fini(&pp.sig);
+    return res;
+}
+
+
+int
+amqp_channel_publish_ex(amqp_channel_t *chan,
+                     const char *exchange,
+                     const char *routing_key,
+                     uint8_t flags,
+                     amqp_header_t *header,
+                     const char *data)
+{
+    int res;
+    amqp_frame_t *fr1;
+    amqp_basic_publish_t *m;
+    amqp_pending_pub_t pp;
+    ssize_t sz;
+
+    res = 0;
+
+    assert(routing_key != NULL);
+    assert(exchange != NULL);
+
+    STQUEUE_ENTRY_INIT(link, &pp);
+    mrkthr_signal_init(&pp.sig, mrkthr_me());
+    pp.publish_tag = ++chan->publish_tag;
+
+    fr1 = amqp_frame_new(chan->id, AMQP_FMETHOD);
+    m = NEWREF(basic_publish)();
+    m->exchange = bytes_new_from_str(exchange);
+    m->routing_key = bytes_new_from_str(routing_key);
+    m->flags = flags;
+    fr1->payload.params = (amqp_meth_params_t *)m;
+    channel_send_frame(chan, fr1);
+
+    fr1 = amqp_frame_new(chan->id, AMQP_FHEADER);
+    fr1->payload.header = header;
+    sz = header->body_size;
     channel_send_frame(chan, fr1);
 
     while (sz > chan->conn->payload_max) {
@@ -1532,7 +1621,7 @@ amqp_channel_cancel(amqp_channel_t *chan,
                                     AMQP_CANCEL,
         assert(consumer_tag != NULL);
         m->consumer_tag = bytes_new_from_str(consumer_tag);
-        m->flags = flags;
+        m->flags = flags;,
     )
 }
 
@@ -1695,7 +1784,7 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
             goto err;
         }
 
-        /* pass consumer_tag from ok to cons */
+        /* transfer consumer_tag reference from ok to cons */
         ok = (amqp_basic_consume_ok_t *)fr0->payload.params;
         assert(ok->consumer_tag != NULL);
         cons->consumer_tag = ok->consumer_tag;
@@ -1792,7 +1881,7 @@ content_thread_worker(UNUSED int argc, void **argv)
 
         assert(cons->content_cb != NULL);
         cons->content_cb(pc->method, pc->header, data, cons->content_udata);
-        free(data);
+        data = NULL; /* passed over to content_cb() */
 
         if (!(cons->flags & CONSUME_FNOACK)) {
             amqp_frame_t *fr1;
@@ -1821,10 +1910,11 @@ err:
 
 }
 
-void
-amqp_consumer_handle_content(amqp_consumer_t *cons,
-                             amqp_consumer_content_cb_t cb,
-                             void *udata)
+
+int
+amqp_consumer_handle_content_spawn(amqp_consumer_t *cons,
+                                   amqp_consumer_content_cb_t cb,
+                                   void *udata)
 {
     cons->content_cb = cb;
     cons->content_udata = udata;
@@ -1832,8 +1922,19 @@ amqp_consumer_handle_content(amqp_consumer_t *cons,
                                         content_thread_worker,
                                         1,
                                         cons);
-    mrkthr_join(cons->content_thread);
+    return mrkthr_join(cons->content_thread);
 
+}
+
+
+int
+amqp_consumer_handle_content(amqp_consumer_t *cons,
+                             amqp_consumer_content_cb_t cb,
+                             void *udata)
+{
+    cons->content_cb = cb;
+    cons->content_udata = udata;
+    return content_thread_worker(1, (void **)(&cons));
 }
 
 int

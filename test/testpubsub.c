@@ -28,7 +28,7 @@ const char *_malloc_options = "AJ";
 
 static char *user = "guest";
 static char *password = "guest";
-static char *exchange = "/";
+static char *vhost = "/";
 static char *src = NULL;
 static char *dest = NULL;
 //static char *dir = NULL;
@@ -100,22 +100,9 @@ void usage(char *path)
 
 
 static void
-declare_queue_cb(UNUSED amqp_channel_t *chan,
-                 amqp_frame_t *fr,
-                 UNUSED void *udata)
-{
-    amqp_queue_declare_t *m;
-
-    m = (amqp_queue_declare_t *)fr->payload.params;
-    table_add_i32(&m->arguments, "x-expires", 3600000);
-    table_add_lstr(&m->arguments, "x-ha-policy", bytes_new_from_str("all"));
-}
-
-
-static void
 my_content_cb(UNUSED amqp_frame_t *method,
               UNUSED amqp_frame_t *header,
-              UNUSED char *data,
+              char *data,
               UNUSED void *udata)
 {
     //TRACE("---");
@@ -123,9 +110,20 @@ my_content_cb(UNUSED amqp_frame_t *method,
     //TRACE("---");
     //CTRACE("C: %s", data);
     //CTRACE("C: %ld", header->payload.header->body_size);
+    if (data != NULL) {
+        free(data);
+    }
     TRACEC("<");
 }
 
+
+static void
+my_header_completion_cb(UNUSED amqp_channel_t *chan,
+                        amqp_header_t *header,
+                        UNUSED void *udata)
+{
+    header->delivery_mode = 2;
+}
 
 static int
 traversedir_cb(const char *dir, struct dirent *de, void *udata)
@@ -167,6 +165,8 @@ traversedir_cb(const char *dir, struct dirent *de, void *udata)
                                  "",
                                  dest,
                                  0,
+                                 my_header_completion_cb,
+                                 NULL,
                                  buf,
                                  sb.st_size);
         free(path);
@@ -230,7 +230,7 @@ create_conn(void)
 
     res = 0;
 
-    conn = amqp_conn_new("localhost", 5672, user, password, exchange, 0, 0, 0);
+    conn = amqp_conn_new("localhost", 5672, user, password, vhost, 0, 0, 0);
 
     if (amqp_conn_open(conn) != 0) {
         res = 1;
@@ -251,6 +251,20 @@ err:
     amqp_conn_destroy(&conn);
     goto end;
 }
+
+
+static void
+declare_queue_cb1(UNUSED amqp_channel_t *chan,
+                  amqp_frame_t *fr,
+                  UNUSED void *udata)
+{
+    amqp_queue_declare_t *m;
+
+    m = (amqp_queue_declare_t *)fr->payload.params;
+    table_add_i32(&m->arguments, "x-expires", 3600000);
+    table_add_lstr(&m->arguments, "x-ha-policy", bytes_new_from_str("all"));
+}
+
 
 static int
 run_conn(int argc, char **argv)
@@ -275,7 +289,8 @@ run_conn(int argc, char **argv)
     if (amqp_channel_declare_queue_ex(chan,
                                       src,
                                       DECLARE_QUEUE_FEXCLUSIVE,
-                                      declare_queue_cb,
+                                      declare_queue_cb1,
+                                      NULL,
                                       NULL) != 0) {
         res = 1;
         goto err;
@@ -291,7 +306,7 @@ run_conn(int argc, char **argv)
 
     mrkthr_spawn("pub", mypub, 3, chan, argc, argv);
 
-    amqp_consumer_handle_content(cons, my_content_cb, NULL);
+    (void)amqp_consumer_handle_content(cons, my_content_cb, NULL);
 
     if (amqp_close_consumer(cons) != 0) {
         res = 1;
@@ -304,7 +319,9 @@ run_conn(int argc, char **argv)
     }
 
 end:
-    (void)amqp_conn_close(conn);
+    if (conn != NULL) {
+        (void)amqp_conn_close(conn);
+    }
     amqp_conn_destroy(&conn);
     return res;
 

@@ -8,6 +8,8 @@
 #include <mrkcommon/dict.h>
 #include <mrkcommon/stqueue.h>
 
+#include <mrkthr.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,6 +37,11 @@ extern "C" {
 #define AMQP_TVOID 'V'
 
 struct _amqp_value;
+struct _amqp_conn;
+struct _amqp_channel;
+struct _amqp_rpc;
+struct _amqp_meth_params;
+struct _amqp_header;
 
 typedef void (*amqp_encode)(struct _amqp_value *, bytestream_t *);
 typedef ssize_t (*amqp_decode)(struct _amqp_value *, bytestream_t *, int);
@@ -80,9 +87,6 @@ typedef struct _amqp_value {
 #define AMQP_FHEADER 2
 #define AMQP_FBODY 3
 #define AMQP_FHEARTBEAT 8
-
-struct _amqp_meth_params;
-struct _amqp_header;
 
 typedef struct _amqp_frame {
     STQUEUE_ENTRY(_amqp_frame, link);
@@ -178,8 +182,6 @@ typedef struct _amqp_frame {
 
 #define AMQP_TX 90
 
-
-struct _amqp_conn;
 
 typedef struct _amqp_meth_params_t *(*amqp_method_new_t)(void);
 
@@ -630,48 +632,6 @@ MPARAMS(basic_nack,
 )
 
 /*
- * header
- */
-
-typedef struct _amqp_header {
-    uint16_t class_id;
-    uint16_t weight;
-    uint64_t body_size;
-#define AMQP_HEADER_FCONTENT_TYPE       (1 << 15)
-#define AMQP_HEADER_FCONTENT_ENCODING   (1 << 14)
-#define AMQP_HEADER_FHEADERS            (1 << 13)
-#define AMQP_HEADER_FDELIVERY_MODE      (1 << 12)
-#define AMQP_HEADER_FPRIORITY           (1 << 11)
-#define AMQP_HEADER_FCORRELATION_ID     (1 << 10)
-#define AMQP_HEADER_FREPLY_TO           (1 << 9)
-#define AMQP_HEADER_FEXPIRATION         (1 << 8)
-#define AMQP_HEADER_FMESSAGE_ID         (1 << 7)
-#define AMQP_HEADER_FTIMESTAMP          (1 << 6)
-#define AMQP_HEADER_FTYPE               (1 << 5)
-#define AMQP_HEADER_FUSER_ID            (1 << 4)
-#define AMQP_HEADER_FAPP_ID             (1 << 3)
-#define AMQP_HEADER_FCLUSTER_ID         (1 << 2)
-    uint16_t flags;
-    bytes_t *content_type;
-    bytes_t *content_encoding;
-    dict_t headers;
-    uint8_t delivery_mode;
-    uint8_t priority;
-    bytes_t *correlation_id;
-    bytes_t *reply_to;
-    bytes_t *expiration;
-    bytes_t *message_id;
-    uint64_t timestamp;
-    bytes_t *type;
-    bytes_t *user_id;
-    bytes_t *app_id;
-    bytes_t *cluster_id;
-
-    uint64_t received_size;
-} amqp_header_t;
-
-
-/*
  * wire API
  */
 #define UNPACK_ECONSUME (-2)
@@ -779,19 +739,8 @@ void amqp_meth_params_destroy(amqp_meth_params_t **);
 
 
 /*
- * header API
- */
-int amqp_header_dec(struct _amqp_conn *, amqp_header_t **);
-int amqp_header_enc(amqp_header_t *, struct _amqp_conn *);
-amqp_header_t *amqp_header_new(void);
-void amqp_header_destroy(amqp_header_t **);
-void amqp_header_dump(amqp_header_t *);
-
-
-/*
  * extended channel API
  */
-struct _amqp_channel;
 typedef void (*amqp_frame_completion_cb_t)(struct _amqp_channel *,
                                            amqp_frame_t *,
                                            void *);
@@ -800,10 +749,12 @@ int amqp_channel_declare_exchange_ex(struct _amqp_channel *,
                                      const char *,
                                      uint8_t,
                                      amqp_frame_completion_cb_t,
+                                     amqp_frame_completion_cb_t,
                                      void *);
 int amqp_channel_declare_queue_ex(struct _amqp_channel *,
                                   const char *,
                                   uint8_t,
+                                  amqp_frame_completion_cb_t,
                                   amqp_frame_completion_cb_t,
                                   void *);
 int amqp_channel_bind_queue_ex(struct _amqp_channel *,
@@ -812,13 +763,25 @@ int amqp_channel_bind_queue_ex(struct _amqp_channel *,
                                const char *,
                                uint8_t,
                                amqp_frame_completion_cb_t,
+                               amqp_frame_completion_cb_t,
                                void *udata);
 int amqp_channel_unbind_queue_ex(struct _amqp_channel *,
                                  const char *,
                                  const char *,
                                  const char *,
                                  amqp_frame_completion_cb_t,
+                                 amqp_frame_completion_cb_t,
                                  void *);
+
+/*
+ * rpc
+ */
+typedef struct _rpc_call_completion {
+    mrkthr_signal_t sig;
+    struct _amqp_rpc *rpc;
+    char *data;
+    size_t sz;
+} rpc_call_completion_t;
 
 #ifdef __cplusplus
 }
