@@ -1520,6 +1520,7 @@ amqp_header_new(void)
     header->weight = 0;
     header->body_size = 0ll;
     header->flags = 0;
+
     header->content_type = NULL;
     header->content_encoding = NULL;
     init_table(&header->headers);
@@ -1535,7 +1536,7 @@ amqp_header_new(void)
     header->app_id = NULL;
     header->cluster_id = NULL;
 
-    header->received_size = 0;
+    header->_received_size = 0;
     return header;
 }
 

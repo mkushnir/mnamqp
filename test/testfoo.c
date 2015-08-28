@@ -102,8 +102,8 @@ cons_thread_worker(UNUSED int argc, void **argv)
         header = amqp_consumer_get_header(cons);
         CTRACE("got header");
 
-        while (header->payload.header->body_size > header->payload.header->received_size) {
-            //TRACE("bs=%ld rs=%ld", header->payload.header->body_size, header->payload.header->received_size);
+        while (header->payload.header->body_size > header->payload.header->_received_size) {
+            //TRACE("bs=%ld rs=%ld", header->payload.header->body_size, header->payload.header->_received_size);
             body = amqp_consumer_get_body(cons);
             CTRACE("got body");
             amqp_frame_destroy(&body);

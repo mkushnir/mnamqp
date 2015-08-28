@@ -284,6 +284,7 @@ unpack_shortstr(bytestream_t *bs, int fd, bytes_t **v)
     memcpy((*v)->data, SPDATA(bs), sz);
     (*v)->data[sz] = '\0';
     SADVANCEPOS(bs, sz);
+    BYTES_INCREF(*v);
     return sizeof(uint8_t) + sz;
 }
 
@@ -324,6 +325,7 @@ unpack_longstr(bytestream_t *bs, int fd, bytes_t **v)
 
     memcpy((*v)->data, SPDATA(bs), sz);
     SADVANCEPOS(bs, sz);
+    BYTES_INCREF(*v);
     return sizeof(uint32_t) + sz;
 }
 

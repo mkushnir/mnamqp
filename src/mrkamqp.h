@@ -130,7 +130,7 @@ typedef struct _amqp_header {
     bytes_t *app_id;
     bytes_t *cluster_id;
 
-    uint64_t received_size;
+    uint64_t _received_size;
 } amqp_header_t;
 
 
@@ -172,6 +172,7 @@ amqp_conn_t *amqp_conn_new(const char *,
 void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
 int amqp_conn_run(amqp_conn_t *);
+mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
 int amqp_conn_close(amqp_conn_t *);
 
 

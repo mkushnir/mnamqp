@@ -1,7 +1,7 @@
 #include <assert.h>
 
 #include <mrkcommon/bytestream.h>
-//#define TRRET_DEBUG_VERBOSE
+#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
@@ -41,6 +41,7 @@ amqp_rpc_new(char *exchange,
     rpc->routing_key = strdup(routing_key);
     if (reply_to != NULL) {
         rpc->reply_to = bytes_new_from_str(reply_to);
+        BYTES_INCREF(rpc->reply_to);
     } else {
         rpc->reply_to = NULL;
     }
@@ -90,21 +91,33 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
     callback_header = NULL;
     callback_data = NULL;
 
-
+    assert(rpc != NULL);
     rpc->server_handler(header->payload.header,
                         data,
                         &callback_header,
                         &callback_data,
                         rpc->server_udata);
-    if (callback_header != NULL) {
-        (void)amqp_channel_publish_ex(rpc->chan,
-                                      rpc->exchange,
-                                      (char *)callback_header->reply_to->data,
-                                      0,
-                                      callback_header,
-                                      callback_data);
-        /* take header over, no free() on the handler side */
-        callback_header = NULL;
+    if (header->payload.header->reply_to != NULL) {
+        if (callback_header != NULL) {
+            if (header->payload.header->correlation_id != NULL) {
+                AMQP_HEADER_SET_REF(correlation_id)(callback_header,
+                        header->payload.header->correlation_id);
+                BYTES_INCREF(header->payload.header->correlation_id);
+            }
+            callback_header->class_id = AMQP_BASIC;
+            (void)amqp_channel_publish_ex(
+                    rpc->chan,
+                    rpc->exchange,
+                    (char *)header->payload.header->reply_to->data,
+                    0,
+                    callback_header, callback_data);
+            /* take header over, no free() on the handler side */
+            callback_header = NULL;
+        } else {
+            TRACE("server handler returned NULL callback header, discarding reply");
+        }
+    } else {
+        TRACE("no reply_to in the incoming call, discarding server reply");
     }
 
     if (data != NULL) {
@@ -142,7 +155,7 @@ amqp_rpc_setup_server(amqp_rpc_t *rpc,
     if ((rpc->cons = amqp_channel_create_consumer(chan,
                                                   rpc->routing_key,
                                                   NULL,
-                                                  0)) != 0) {
+                                                  0)) == NULL) {
         res = AMQP_RPC_SETUP_SERVER + 3;
         goto err;
     }
@@ -163,8 +176,8 @@ err:
  */
 static void
 amqp_rpc_setup_client_cb0(UNUSED amqp_channel_t *chan,
-                      amqp_frame_t *fr0,
-                      void *udata)
+                          amqp_frame_t *fr0,
+                          void *udata)
 {
     amqp_rpc_t *rpc;
     amqp_queue_declare_ok_t *m;
@@ -173,6 +186,7 @@ amqp_rpc_setup_client_cb0(UNUSED amqp_channel_t *chan,
     /* transfer queue reference */
     m = (amqp_queue_declare_ok_t *)fr0->payload.params;
     rpc->reply_to = m->queue;
+    BYTES_INCREF(rpc->reply_to);
     m->queue = NULL;
 
 }
@@ -249,7 +263,7 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
     if ((rpc->cons = amqp_channel_create_consumer(chan,
                                                   (char *)rpc->reply_to->data,
                                                   NULL,
-                                                  0)) != 0) {
+                                                  0)) == NULL) {
         res = AMQP_RPC_SETUP_CLIENT + 3;
         goto err;
     }
@@ -262,6 +276,83 @@ err:
     goto end;
 }
 
+
+static void
+rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
+                              amqp_header_t *header,
+                              void *udata)
+{
+    struct {
+        bytes_t *reply_to;
+        bytes_t *cid;
+    } *params;
+
+    params = udata;
+    assert(params->reply_to != NULL);
+    assert(params->cid != NULL);
+
+    AMQP_HEADER_SET_REF(reply_to)(header, params->reply_to);
+    BYTES_INCREF(params->reply_to); // nref +1
+    AMQP_HEADER_SET_REF(correlation_id)(header, params->cid);
+    BYTES_INCREF(params->cid); // nref +1
+}
+
+
+int
+amqp_rpc_call(amqp_rpc_t *rpc,
+              bytes_t *request,
+              char **reply,
+              size_t *sz)
+{
+    int res;
+    struct {
+        bytes_t *reply_to;
+        bytes_t *cid;
+    } params;
+
+    rpc_call_completion_t cc;
+
+
+    res = 0;
+    params.reply_to = rpc->reply_to;
+    params.cid = bytes_printf("%016lx", ++rpc->next_id);
+    BYTES_INCREF(params.cid); // nref 1
+    cc.rpc = rpc;
+    cc.data = NULL;
+    cc.sz = 0;
+    mrkthr_signal_init(&cc.sig, mrkthr_me());
+    assert(dict_get_item(&rpc->calls, params.cid) == NULL);
+    dict_set_item(&rpc->calls, params.cid, &cc);
+
+    if (amqp_channel_publish(rpc->chan,
+                             rpc->exchange,
+                             rpc->routing_key,
+                             0,
+                             rpc_call_header_completion_cb,
+                             &params, // nref +- 1
+                             (char *)request->data,
+                             request->sz) != 0) {
+        res = AMQP_RPC_CALL + 1;
+        goto err;
+    }
+
+    if (mrkthr_signal_subscribe(&cc.sig) != 0) {
+        res = AMQP_RPC_CALL + 2;
+        goto err;
+    }
+
+    *reply = cc.data;
+    *sz = cc.sz;
+
+end:
+    dict_remove_item(&rpc->calls, params.cid);
+    BYTES_DECREF(&params.cid); // nref 0
+    mrkthr_signal_fini(&cc.sig);
+    return res;
+err:
+    TR(res);
+    goto end;
+}
 
 /*
  *
@@ -280,6 +371,25 @@ amqp_rpc_teardown(amqp_rpc_t *rpc)
 }
 
 
+static int
+amqp_rpc_run_spwan_worker(UNUSED int argc, void **argv)
+{
+    amqp_rpc_t *rpc;
+
+    assert(argc == 1);
+    rpc = argv[0];
+    return amqp_consumer_handle_content(rpc->cons, rpc->cb, rpc);
+}
+
+
+mrkthr_ctx_t *
+amqp_rpc_run_spawn(amqp_rpc_t *rpc)
+{
+    assert(rpc->cons != NULL);
+    assert(rpc->cb != NULL);
+    return mrkthr_spawn("rpcspawn", amqp_rpc_run_spwan_worker, 1, rpc);
+}
+
 int
 amqp_rpc_run(amqp_rpc_t *rpc)
 {
@@ -288,72 +398,4 @@ amqp_rpc_run(amqp_rpc_t *rpc)
     return amqp_consumer_handle_content(rpc->cons, rpc->cb, rpc);
 }
 
-
-static void
-rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
-                              amqp_header_t *header,
-                              void *udata)
-{
-    bytes_t *cid;
-
-    cid = udata;
-    assert(cid != NULL);
-
-    AMQP_HEADER_SET_REF(correlation_id)(header, cid);
-    BYTES_INCREF(cid); // nref +1
-}
-
-
-int
-amqp_rpc_call(amqp_rpc_t *rpc,
-              bytes_t *request,
-              char **reply,
-              size_t *sz)
-{
-    int res;
-    bytes_t *cid;
-    UNUSED dict_item_t *dit;
-
-    rpc_call_completion_t cc;
-
-
-    res = 0;
-    cid = bytes_printf("%016lx", ++rpc->next_id);
-    cc.rpc = rpc;
-    cc.data = NULL;
-    cc.sz = 0;
-    mrkthr_signal_init(&cc.sig, mrkthr_me());
-    assert(dict_get_item(&rpc->calls, cid) == NULL);
-    dict_set_item(&rpc->calls, cid, &cc);
-    BYTES_INCREF(cid); // nref 1
-
-    if (amqp_channel_publish(rpc->chan,
-                             rpc->exchange,
-                             rpc->routing_key,
-                             0,
-                             rpc_call_header_completion_cb,
-                             cid, // nref +- 1
-                             (char *)request->data,
-                             request->sz) != 0) {
-        res = AMQP_RPC_CALL + 1;
-        goto err;
-    }
-
-    if (mrkthr_signal_subscribe(&cc.sig) != 0) {
-        res = AMQP_RPC_CALL + 2;
-        goto err;
-    }
-
-    *reply = cc.data;
-    *sz = cc.sz;
-
-end:
-    dict_remove_item(&rpc->calls, cid);
-    BYTES_DECREF(&cid); // nref 0
-    mrkthr_signal_fini(&cc.sig);
-    return res;
-err:
-    TR(res);
-    goto end;
-}
 

@@ -328,7 +328,6 @@ end:
 err:
     TR(res);
     goto end;
-
 }
 
 static int
@@ -382,7 +381,7 @@ main(int argc, char **argv)
         return 1;
     }
 
-    while ((ch = getopt(argc, argv, "hd:s:")) != -1) {
+    while ((ch = getopt(argc, argv, "d:hs:")) != -1) {
         switch (ch) {
         case 'h':
             usage(argv[0]);

@@ -22,7 +22,7 @@
 #include <netinet/ip.h> // IPTOS_LOWDELAY
 
 #include <mrkcommon/bytestream.h>
-//#define TRRET_DEBUG_VERBOSE
+#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/stqueue.h>
 #include <mrkcommon/util.h>
@@ -1857,7 +1857,7 @@ content_thread_worker(UNUSED int argc, void **argv)
         }
 
         while (pc->header->payload.header->body_size >
-               pc->header->payload.header->received_size) {
+               pc->header->payload.header->_received_size) {
             size_t sz0;
             amqp_frame_t *fr;
 
@@ -1868,9 +1868,9 @@ content_thread_worker(UNUSED int argc, void **argv)
                 }
                 continue;
             }
-            sz0 = pc->header->payload.header->received_size;
+            sz0 = pc->header->payload.header->_received_size;
             memcpy(data + sz0, fr->payload.body, fr->sz);
-            pc->header->payload.header->received_size += fr->sz;
+            pc->header->payload.header->_received_size += fr->sz;
             STQUEUE_DEQUEUE(&pc->body, link);
             STQUEUE_ENTRY_FINI(link, fr);
             amqp_frame_destroy(&fr);
