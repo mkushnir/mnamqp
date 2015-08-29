@@ -129,18 +129,21 @@ run_conn(void)
 
             bytes_t *request;
 
-            CTRACE();
             request = bytes_printf("test %ld", mrkthr_get_now());
             reply = NULL;
             sz = 0;
-            res = amqp_rpc_call(rpc, request, &reply, &sz);
+            res = amqp_rpc_call(rpc, request, &reply, &sz, 2000);
             BYTES_DECREF(&request);
             D8(reply, sz);
             if (reply != NULL) {
                 free(reply);
             }
             if (res != 0) {
-                break;
+                if (res != MRKTHR_WAIT_TIMEOUT) {
+                    break;
+                } else {
+                    CTRACE("timeout, ignoring ...");
+                }
             }
             mrkthr_sleep(1000);
         }

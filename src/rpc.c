@@ -1,7 +1,7 @@
 #include <assert.h>
 
 #include <mrkcommon/bytestream.h>
-#define TRRET_DEBUG_VERBOSE
+//#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
@@ -155,7 +155,7 @@ amqp_rpc_setup_server(amqp_rpc_t *rpc,
     if ((rpc->cons = amqp_channel_create_consumer(chan,
                                                   rpc->routing_key,
                                                   NULL,
-                                                  0)) == NULL) {
+                                                  CONSUME_FNOACK)) == NULL) {
         res = AMQP_RPC_SETUP_SERVER + 3;
         goto err;
     }
@@ -207,9 +207,8 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
 
         if ((dit = dict_get_item(&rpc->calls,
                                  header->payload.header->correlation_id)) == NULL) {
-            TRACE("no pending call for this correlation_id in header, "
-                  "ignoring:");
-            amqp_frame_dump(header);
+            TRACE("no pending call for correlation_id %s, ignoring",
+                  (char *)header->payload.header->correlation_id->data);
             if (data != NULL) {
                 free(data);
             }
@@ -263,7 +262,7 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
     if ((rpc->cons = amqp_channel_create_consumer(chan,
                                                   (char *)rpc->reply_to->data,
                                                   NULL,
-                                                  0)) == NULL) {
+                                                  CONSUME_FNOACK)) == NULL) {
         res = AMQP_RPC_SETUP_CLIENT + 3;
         goto err;
     }
@@ -302,7 +301,8 @@ int
 amqp_rpc_call(amqp_rpc_t *rpc,
               bytes_t *request,
               char **reply,
-              size_t *sz)
+              size_t *sz,
+              uint64_t timeout)
 {
     int res;
     struct {
@@ -336,8 +336,10 @@ amqp_rpc_call(amqp_rpc_t *rpc,
         goto err;
     }
 
-    if (mrkthr_signal_subscribe(&cc.sig) != 0) {
-        res = AMQP_RPC_CALL + 2;
+    if ((res = mrkthr_signal_subscribe_with_timeout(&cc.sig, timeout)) != 0) {
+        if (res != MRKTHR_WAIT_TIMEOUT) {
+            res = AMQP_RPC_CALL + 2;
+        }
         goto err;
     }
 

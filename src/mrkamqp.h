@@ -334,7 +334,7 @@ int amqp_rpc_setup_server(amqp_rpc_t *,
                           void *);
 int amqp_rpc_run(amqp_rpc_t *);
 int amqp_rpc_teardown(amqp_rpc_t *);
-int amqp_rpc_call(amqp_rpc_t *, bytes_t *, char **, size_t *);
+int amqp_rpc_call(amqp_rpc_t *, bytes_t *, char **, size_t *, uint64_t);
 
 /*
  * module

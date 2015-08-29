@@ -22,7 +22,7 @@
 #include <netinet/ip.h> // IPTOS_LOWDELAY
 
 #include <mrkcommon/bytestream.h>
-#define TRRET_DEBUG_VERBOSE
+//#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/stqueue.h>
 #include <mrkcommon/util.h>
@@ -321,8 +321,8 @@ next_frame(amqp_conn_t *conn)
                 m = (amqp_basic_deliver_t *)fr->payload.params;
                 if ((dit = dict_get_item(&(*chan)->consumers,
                                          m->consumer_tag)) == NULL) {
-                    CTRACE("cannot find consumer: %s, "
-                           "discarding frame (basic.deliver)",
+                    CTRACE("got basic.deliver to %s, "
+                           "cannot find, discarding frame",
                           m->consumer_tag->data);
                     amqp_frame_destroy_method(&fr);
 
@@ -491,7 +491,7 @@ next_frame(amqp_conn_t *conn)
             cons = (*chan)->content_consumer;
 
             if (cons == NULL) {
-                CTRACE("got header, not found consumer, discarding frame");
+                CTRACE("got body, not found consumer, discarding frame");
                 amqp_frame_destroy_body(&fr);
 
             } else {
@@ -499,7 +499,7 @@ next_frame(amqp_conn_t *conn)
 
                 pc = STQUEUE_TAIL(&cons->pending_content);
                 if (pc == NULL) {
-                    CTRACE("got header, not found pending content, "
+                    CTRACE("got body, not found pending content, "
                            "discarding frame");
                     amqp_frame_destroy_header(&fr);
                 } else {
