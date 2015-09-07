@@ -74,7 +74,7 @@ int                                                    \
 amqp_##mname##_enc(UNUSED amqp_meth_params_t *self,    \
                    UNUSED amqp_conn_t *conn)           \
 {                                                      \
-    amqp_##mname##_t *m;                               \
+    UNUSED amqp_##mname##_t *m;                        \
     m = (amqp_##mname##_t *)self;                      \
     __fields                                           \
     return 0;                                          \

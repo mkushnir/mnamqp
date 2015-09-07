@@ -12,7 +12,7 @@
 #endif
 
 #include <assert.h>
-
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -22,7 +22,7 @@
 #include <netinet/ip.h> // IPTOS_LOWDELAY
 
 #include <mrkcommon/bytestream.h>
-//#define TRRET_DEBUG_VERBOSE
+#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/stqueue.h>
 #include <mrkcommon/util.h>
@@ -83,7 +83,7 @@ amqp_conn_new(const char *host,
     array_init(&conn->channels, sizeof(amqp_channel_t *), 0,
                NULL,
                (array_finalizer_t)amqp_channel_destroy);
-    conn->closed = 0;
+    conn->closed = 1;
     return conn;
 }
 
@@ -107,6 +107,7 @@ amqp_conn_open(amqp_conn_t *conn)
 
     for (ai = ainfos; ai != NULL; ai = ai->ai_next) {
         UNUSED int optval;
+        UNUSED socklen_t optlen;
 
         if ((conn->fd = socket(ai->ai_family,
                                ai->ai_socktype,
@@ -132,20 +133,20 @@ amqp_conn_open(amqp_conn_t *conn)
         //    FAIL("setsockopt");
         //}
 
-
-        if (connect(conn->fd, ai->ai_addr, ai->ai_addrlen) != 0) {
-            perror("connect");
-            TRRET(AMQP_CONN_OPEN + 1);
+        if (mrkthr_connect(conn->fd, ai->ai_addr, ai->ai_addrlen) != 0) {
+            TRRET(AMQP_CONN_OPEN + 2);
         }
+
         break;
     }
 
     freeaddrinfo(ainfos);
 
     if (conn->fd < 0) {
-        TRRET(AMQP_CONN_OPEN + 1);
+        TRRET(AMQP_CONN_OPEN + 3);
     }
 
+    conn->closed = 0;
     return 0;
 }
 
@@ -521,14 +522,22 @@ next_frame(amqp_conn_t *conn)
         break;
 
     case AMQP_FHEARTBEAT:
+        {
+            amqp_frame_t *fr1;
+
 #ifdef TRRET_DEBUG_VERBOSE
-        TRACEC("<<< ");
-        amqp_frame_dump(fr);
-        TRACEC("\n");
+            TRACEC("<<< ");
+            amqp_frame_dump(fr);
+            TRACEC("\n");
 #endif
-        if (fr->chan != 0) {
-            res = UNPACK + 230;
-            goto err; // 501 frame error
+            if (fr->chan != 0) {
+                res = UNPACK + 230;
+                goto err; // 501 frame error
+            }
+
+            fr1 = amqp_frame_new((*chan)->id, AMQP_FHEARTBEAT);
+            channel_send_frame(*chan, fr1);
+            fr1 = NULL;
         }
         break;
 
@@ -631,7 +640,7 @@ recv_thread(UNUSED int argc, void **argv)
     assert(argc == 1);
     conn = argv[0];
 
-    while (1) {
+    while (!conn->closed) {
         if (next_frame(conn) != 0) {
             break;
         }
@@ -661,7 +670,7 @@ send_thread_worker(UNUSED int argc, void **argv)
     assert(argc == 1);
     conn = argv[0];
     mrkthr_signal_init(&conn->oframe_sig, mrkthr_me());
-    while (1) {
+    while (!conn->closed) {
         amqp_frame_t *fr;
 
         if ((fr = STQUEUE_HEAD(&conn->oframes)) == NULL) {
@@ -738,13 +747,13 @@ amqp_conn_run(amqp_conn_t *conn)
     start_ok = NEWREF(connection_start_ok)();
     table_add_lstr(&start_ok->client_properties,
                    "product",
-                   bytes_new_from_str("mrkamqp"));
+                   bytes_new_from_str(PACKAGE_NAME));
     table_add_lstr(&start_ok->client_properties,
                    "version",
-                   bytes_new_from_str("0.1"));
+                   bytes_new_from_str(PACKAGE_VERSION));
     table_add_lstr(&start_ok->client_properties,
                    "information",
-                   bytes_new_from_str("http://"));
+                   bytes_new_from_str(PACKAGE_URL));
     caps = amqp_value_new(AMQP_TTABLE);
     init_table(&caps->value.t);
     table_add_bool(&caps->value.t, "publisher_confirms", 1);
@@ -840,6 +849,10 @@ amqp_conn_close(amqp_conn_t *conn)
 
     res = 0;
     fr0 = NULL;
+
+    if (conn == NULL) {
+        return 0;
+    }
 
     if (conn->chan0 == NULL || conn->closed) {
         goto end1;
@@ -1457,6 +1470,10 @@ amqp_channel_publish(amqp_channel_t *chan,
     assert(routing_key != NULL);
     assert(exchange != NULL);
 
+    if (chan->closed) {
+        TRRET(CHANNEL_PUBLISH + 1);
+    }
+
     STQUEUE_ENTRY_INIT(link, &pp);
     mrkthr_signal_init(&pp.sig, mrkthr_me());
     pp.publish_tag = ++chan->publish_tag;
@@ -1505,7 +1522,7 @@ amqp_channel_publish(amqp_channel_t *chan,
     if (chan->confirm_mode) {
         STQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
         if (mrkthr_signal_subscribe(&pp.sig) != 0) {
-            res = CHANNEL_PUBLISH + 1;
+            res = CHANNEL_PUBLISH + 2;
         }
     }
 
@@ -1823,7 +1840,7 @@ content_thread_worker(UNUSED int argc, void **argv)
     mrkthr_signal_init(&cons->content_sig, mrkthr_me());
 
     //CTRACE("consumer %s listening ...", cons->consumer_tag->data);
-    while (1) {
+    while (!cons->closed) {
         amqp_pending_content_t *pc;
         char *data;
 

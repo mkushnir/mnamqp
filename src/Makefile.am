@@ -24,14 +24,14 @@ else
 DEBUG_FLAGS = -DNDEBUG -O3
 endif
 
-libmrkamqp_la_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
+libmrkamqp_la_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
 
 libmrkamqp_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon
 
 SUBDIRS = .
 
 diag.c diag.h: diag.txt
-	sh ./gen-diag mrkamqp
+	$(AM_V_GEN) /bin/sh ./gen-diag mrkamqp
 
 run: all
 	for i in $(bin_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;

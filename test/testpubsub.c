@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <fcntl.h>
 #include <libgen.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -9,6 +8,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h> /* open(2) */
 
 #define TRRET_DEBUG
 #include <mrkcommon/dumpm.h>
@@ -37,6 +37,9 @@ static amqp_conn_t *conn = NULL;
 
 static int shutting_down = 0;
 
+#ifndef SIGINGO
+UNUSED
+#endif
 static void
 myinfo(UNUSED int sig)
 {
@@ -377,9 +380,11 @@ main(int argc, char **argv)
     if (signal(SIGTERM, myterm) == SIG_ERR) {
         return 1;
     }
+#ifdef SIGINFO
     if (signal(SIGINFO, myinfo) == SIG_ERR) {
         return 1;
     }
+#endif
 
     while ((ch = getopt(argc, argv, "d:hs:")) != -1) {
         switch (ch) {

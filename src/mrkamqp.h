@@ -285,9 +285,6 @@ int amqp_consumer_handle_content_spawn(amqp_consumer_t *,
 int amqp_consumer_handle_content(amqp_consumer_t *,
                                  amqp_consumer_content_cb_t,
                                  void *);
-amqp_frame_t *amqp_consumer_get_method(amqp_consumer_t *);
-amqp_frame_t *amqp_consumer_get_header(amqp_consumer_t *);
-amqp_frame_t *amqp_consumer_get_body(amqp_consumer_t *);
 void amqp_consumer_reset_content_state(amqp_consumer_t *);
 int amqp_close_consumer(amqp_consumer_t *);
 

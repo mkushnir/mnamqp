@@ -19,21 +19,21 @@ endif
 
 nodist_testfoo_SOURCES = ../src/diag.c
 testfoo_SOURCES = testfoo.c
-testfoo_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
+testfoo_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
 testfoo_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
 
 nodist_testpubsub_SOURCES = ../src/diag.c
 testpubsub_SOURCES = testpubsub.c
-testpubsub_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
+testpubsub_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
 testpubsub_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
 
 nodist_testrpc_SOURCES = ../src/diag.c
 testrpc_SOURCES = testrpc.c
-testrpc_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
+testrpc_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir) -I$(top_srcdir) -I$(top_srcdir)/src
 testrpc_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
-	sh ../src/gen-diag mrkamqp
+	$(AM_V_GEN) /bin/sh ../gen-diag mrkamqp
 
 testrun: all
 	for i in $(noinst_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;

@@ -31,6 +31,9 @@ static amqp_conn_t *conn = NULL;
 static int shutting_down = 0;
 static int mode = 0;
 
+#ifndef SIGINGO
+UNUSED
+#endif
 static void
 myinfo(UNUSED int sig)
 {
@@ -52,7 +55,9 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
     if (!shutting_down) {
         TRACE("Shutting down. Another signal will cause immediate exit.");
         shutting_down = 1;
-        amqp_conn_close(conn);
+        if (conn != NULL) {
+            amqp_conn_close(conn);
+        }
         amqp_conn_destroy(&conn);
         _shutdown();
     } else {
@@ -140,9 +145,10 @@ run_conn(void)
             }
             if (res != 0) {
                 if (res != MRKTHR_WAIT_TIMEOUT) {
+                    CTRACE("breaking loop ...");
                     break;
                 } else {
-                    CTRACE("timeout, ignoring ...");
+                    CTRACE("timeout, skipping ...");
                 }
             }
             mrkthr_sleep(1000);
@@ -184,7 +190,7 @@ create_conn(void)
 
     res = 0;
 
-    conn = amqp_conn_new("localhost", 5672, user, password, vhost, 0, 0, 0);
+    conn = amqp_conn_new("10.1.2.10", 5672, user, password, vhost, 0, 0, 0);
 
     if (amqp_conn_open(conn) != 0) {
         res = 1;
@@ -229,6 +235,7 @@ err:
         assert(conn == NULL);
         CTRACE("Reconnecting ...");
         mrkthr_sleep(1000);
+        mrkthr_set_retval(0);
         continue;
     }
 
@@ -248,9 +255,11 @@ main(int argc, char **argv)
     if (signal(SIGTERM, myterm) == SIG_ERR) {
         return 1;
     }
+#ifdef SIGINFO
     if (signal(SIGINFO, myinfo) == SIG_ERR) {
         return 1;
     }
+#endif
 
     while ((ch = getopt(argc, argv, "chs")) != -1) {
         switch (ch) {
@@ -268,6 +277,7 @@ main(int argc, char **argv)
             break;
 
         default:
+            FAIL("main");
             break;
         }
     }

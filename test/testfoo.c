@@ -57,7 +57,7 @@ myterm(UNUSED int sig)
 UNUSED static int
 mypub(UNUSED int argc, void **argv)
 {
-    amqp_channel_t *chan;
+    UNUSED amqp_channel_t *chan;
 
     assert(argc == 1);
     chan = argv[0];
@@ -80,39 +80,6 @@ mypub(UNUSED int argc, void **argv)
         //}
     }
     CTRACE("Exiting mypub...");
-    return 0;
-}
-
-
-UNUSED static int
-cons_thread_worker(UNUSED int argc, void **argv)
-{
-    amqp_consumer_t *cons;
-
-    assert(argc == 1);
-    cons = argv[0];
-
-    CTRACE("consumer %s listening ...", cons->consumer_tag->data);
-    while (1) {
-        amqp_frame_t *method, *header, *body;
-
-        //CTRACE("new state ...");
-        method = amqp_consumer_get_method(cons);
-        CTRACE("got method");
-        header = amqp_consumer_get_header(cons);
-        CTRACE("got header");
-
-        while (header->payload.header->body_size > header->payload.header->_received_size) {
-            //TRACE("bs=%ld rs=%ld", header->payload.header->body_size, header->payload.header->_received_size);
-            body = amqp_consumer_get_body(cons);
-            CTRACE("got body");
-            amqp_frame_destroy(&body);
-        }
-
-        amqp_consumer_reset_content_state(cons);
-
-    }
-
     return 0;
 }
 
