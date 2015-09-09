@@ -37,7 +37,7 @@ static amqp_conn_t *conn = NULL;
 
 static int shutting_down = 0;
 
-#ifndef SIGINGO
+#ifndef SIGINFO
 UNUSED
 #endif
 static void
