@@ -728,9 +728,10 @@ amqp_conn_run(amqp_conn_t *conn)
 
     conn->chan0 = amqp_channel_new(conn);
     assert(conn->chan0->id == 0);
-    conn->chan0->closed = 1; /* trick */
     conn->recv_thread = mrkthr_spawn("recvthr", recv_thread, 1, conn);
+    mrkthr_set_prio(conn->recv_thread, 1);
     conn->send_thread = mrkthr_spawn("sendthr", send_thread_worker, 1, conn);
+    mrkthr_set_prio(conn->send_thread, 1);
 
     // >>> AMQP0091
     send_raw_octets(conn, (uint8_t *)greeting, sizeof(greeting));
@@ -1002,7 +1003,7 @@ amqp_channel_new(amqp_conn_t *conn)
     (*chan)->publish_tag = 0ll;
     STQUEUE_INIT(&(*chan)->pending_pub);
     (*chan)->confirm_mode = 0;
-    (*chan)->closed = 0;
+    (*chan)->closed = 1;
     return *chan;
 }
 
@@ -1123,6 +1124,8 @@ amqp_create_channel(amqp_conn_t *conn)
         goto err;
     }
 
+    chan->closed = 0;
+
 end:
     amqp_frame_destroy_method(&fr0);
     return chan;
@@ -1141,8 +1144,12 @@ err:
     int res;                                                   \
     amqp_frame_t *fr0, *fr1;                                   \
     amqp_##mname##_t *m;                                       \
-    res = 0;                                                   \
     fr0 = NULL;                                                \
+    if (chan->closed) {                                        \
+        res = errid + 1;                                       \
+        goto err;                                              \
+    }                                                          \
+    res = 0;                                                   \
     fr1 = amqp_frame_new(chan->id, AMQP_FMETHOD);              \
     m = NEWREF(mname)();                                       \
     __a1                                                       \
@@ -1150,7 +1157,7 @@ err:
     channel_send_frame(chan, fr1);                             \
     fr1 = NULL;                                                \
     if (channel_expect_method(chan, okmid, &fr0) != 0) {       \
-        res = errid + 1;                                       \
+        res = errid + 2;                                       \
         goto err;                                              \
     }                                                          \
     __a0                                                       \
@@ -1172,8 +1179,12 @@ err:                                                           \
     int res;                                                   \
     amqp_frame_t *fr0, *fr1;                                   \
     amqp_##mname##_t *m;                                       \
-    res = 0;                                                   \
     fr0 = NULL;                                                \
+    if (chan->closed) {                                        \
+        res = errid + 1;                                       \
+        goto err;                                              \
+    }                                                          \
+    res = 0;                                                   \
     fr1 = amqp_frame_new(chan->id, AMQP_FMETHOD);              \
     m = NEWREF(mname)();                                       \
     fr1->payload.params = (amqp_meth_params_t *)m;             \
@@ -1550,6 +1561,10 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     assert(routing_key != NULL);
     assert(exchange != NULL);
 
+    if (chan->closed) {
+        TRRET(CHANNEL_PUBLISH + 1);
+    }
+
     STQUEUE_ENTRY_INIT(link, &pp);
     mrkthr_signal_init(&pp.sig, mrkthr_me());
     pp.publish_tag = ++chan->publish_tag;
@@ -1593,7 +1608,7 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     if (chan->confirm_mode) {
         STQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
         if (mrkthr_signal_subscribe(&pp.sig) != 0) {
-            res = CHANNEL_PUBLISH + 1;
+            res = CHANNEL_PUBLISH + 2;
         }
     }
 
@@ -1772,6 +1787,7 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
     bytes_t *ctag;
 
     fr0 = NULL;
+    cons = NULL;
 
     if ((flags & CONSUME_FNOWAIT) &&
         (consumer_tag == NULL || *consumer_tag == '\0')) {
