@@ -41,6 +41,8 @@ else
     fi
 fi
 
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
 #uname_s=`uname -s`
 #if test "$uname_s" = "Linux"
 #then
@@ -50,7 +52,7 @@ fi
 #fi
 
 case "$target_os" in
-    linux*)
+    *linux*)
         AC_SUBST(_GNU_SOURCE_MACRO, ['-D_GNU_SOURCE'])
     ;;
     *)
