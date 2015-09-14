@@ -32,6 +32,15 @@
 
 #include "diag.h"
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp);
+#ifdef BYTES_DECREF
+#undef BYTES_DECREF
+#define BYTES_DECREF bytes_decref
+#endif
+#endif
+
 static void amqp_conn_stop_threads(amqp_conn_t *);
 static amqp_channel_t *amqp_channel_new(amqp_conn_t *);
 static int amqp_channel_destroy(amqp_channel_t **);

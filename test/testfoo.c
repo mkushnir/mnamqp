@@ -11,6 +11,11 @@
 
 #include "unittest.h"
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp_testfoo);
+#endif
+
 #ifndef NDEBUG
 const char *_malloc_options = "AJ";
 #endif

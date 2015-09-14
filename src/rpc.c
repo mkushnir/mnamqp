@@ -1,5 +1,10 @@
 #include <assert.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp_rpc);
+#endif
+
 #include <mrkcommon/bytestream.h>
 //#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
@@ -114,12 +119,16 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
             /* take header over, no free() on the handler side */
             callback_header = NULL;
         } else {
-            TRACE("server handler returned NULL callback header, discarding reply");
+            CTRACE("server handler returned NULL callback header, discarding reply");
         }
     } else {
-        TRACE("no reply_to in the incoming call, discarding server reply");
+        amqp_header_destroy(&callback_header);
+        CTRACE("no reply_to in the incoming call, discarding server reply");
     }
 
+    if (callback_data != NULL) {
+        free(callback_data);
+    }
     if (data != NULL) {
         free(data);
     }
@@ -207,7 +216,7 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
 
         if ((dit = dict_get_item(&rpc->calls,
                                  header->payload.header->correlation_id)) == NULL) {
-            TRACE("no pending call for correlation_id %s, ignoring",
+            CTRACE("no pending call for correlation_id %s, ignoring",
                   (char *)header->payload.header->correlation_id->data);
             if (data != NULL) {
                 free(data);
@@ -221,7 +230,7 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
             mrkthr_signal_send(&cc->sig);
         }
     } else {
-        TRACE("no correlation_id in header, ignoring:");
+        CTRACE("no correlation_id in header, ignoring:");
         amqp_frame_dump(header);
         if (data != NULL) {
             free(data);

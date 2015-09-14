@@ -1,3 +1,8 @@
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp_frame);
+#endif
+
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>

@@ -6,6 +6,11 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp_testrpc);
+#endif
+
 #define TRRET_DEBUG
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/traversedir.h>
@@ -38,6 +43,10 @@ static void
 myinfo(UNUSED int sig)
 {
     mrkthr_dump_all_ctxes();
+#ifdef DO_MEMDEBUG
+    //memdebug_print_stats_oneline();
+    memdebug_print_stats();
+#endif
 }
 
 
@@ -46,6 +55,10 @@ _shutdown(void)
 {
     mrkamqp_fini();
     mrkthr_shutdown();
+#ifdef DO_MEMDEBUG
+    //memdebug_print_stats_oneline();
+    memdebug_print_stats();
+#endif
 }
 
 
@@ -61,6 +74,10 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
         amqp_conn_destroy(&conn);
         _shutdown();
     } else {
+#ifdef DO_MEMDEBUG
+        //memdebug_print_stats_oneline();
+        memdebug_print_stats();
+#endif
         TRACE("Exiting (sigshutdown)...");
         exit(0);
     }
@@ -249,6 +266,18 @@ main(int argc, char **argv)
 {
     int ch;
 
+#ifdef DO_MEMDEBUG
+    MEMDEBUG_REGISTER(array);
+    MEMDEBUG_REGISTER(bytes);
+    MEMDEBUG_REGISTER(bytestream);
+    MEMDEBUG_REGISTER(mrkamqp);
+    MEMDEBUG_REGISTER(mrkamqp_wire);
+    MEMDEBUG_REGISTER(mrkamqp_frame);
+    MEMDEBUG_REGISTER(mrkamqp_spec);
+    MEMDEBUG_REGISTER(mrkamqp_rpc);
+    MEMDEBUG_REGISTER(mrkamqp_testrpc);
+#endif
+
     if (signal(SIGINT, myterm) == SIG_ERR) {
         return 1;
     }
@@ -294,6 +323,10 @@ main(int argc, char **argv)
     _shutdown();
     mrkthr_fini();
 
+#ifdef DO_MEMDEBUG
+    //memdebug_print_stats_oneline();
+    memdebug_print_stats();
+#endif
     return 0;
 }
 

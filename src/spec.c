@@ -1,3 +1,8 @@
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp_spec);
+#endif
+
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/dict.h>
 #define TRRET_DEBUG
@@ -182,6 +187,7 @@ DEC(connection_start_ok,
 FINI(connection_start_ok,
     dict_fini(&m->client_properties);
     BYTES_DECREF(&m->mechanism);
+    BYTES_DECREF(&m->response);
     BYTES_DECREF(&m->locale);
 )
 
@@ -1070,6 +1076,8 @@ ENC(basic_publish,
 DEC(basic_publish,
 )
 FINI(basic_publish,
+    BYTES_DECREF(&m->exchange);
+    BYTES_DECREF(&m->routing_key);
 )
 
 

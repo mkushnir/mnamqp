@@ -13,6 +13,11 @@
 //#include <arpa/inet.h>
 #include <string.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp_wire);
+#endif
+
 #include <mrkcommon/dict.h>
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/bytes.h>
@@ -22,7 +27,6 @@
 #include <mrkamqp_private.h>
 
 #include "diag.h"
-
 
 
 /*
