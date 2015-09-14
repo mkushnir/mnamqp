@@ -1,6 +1,11 @@
 #include <assert.h>
 #include <signal.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkamqp_testfoo);
+#endif
+
 #define TRRET_DEBUG
 #include <mrkcommon/dumpm.h>
 
@@ -11,35 +16,11 @@
 
 #include "unittest.h"
 
-#ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkamqp_testfoo);
-#endif
-
 #ifndef NDEBUG
 const char *_malloc_options = "AJ";
 #endif
 
 static amqp_conn_t *conn = NULL;
-
-static void
-test0(void)
-{
-    struct {
-        long rnd;
-        int in;
-        int expected;
-    } data[] = {
-        {0, 0, 0},
-    };
-    UNITTEST_PROLOG_RAND;
-
-    FOREACHDATA {
-        //TRACE("in=%d expected=%d", CDATA.in, CDATA.expected);
-        assert(CDATA.in == CDATA.expected);
-    }
-}
-
 
 static int
 _shutdown(UNUSED int argc, UNUSED void **argv)
@@ -48,6 +29,9 @@ _shutdown(UNUSED int argc, UNUSED void **argv)
     amqp_conn_destroy(&conn);
     mrkamqp_fini();
     //mrkthr_fini();
+#ifdef DO_MEMDEBUG
+    memdebug_print_stats();
+#endif
     exit(0);
     return 0;
 }
@@ -59,7 +43,7 @@ myterm(UNUSED int sig)
     (void)mrkthr_spawn("shutdown_thread", _shutdown, 0);
 }
 
-UNUSED static int
+static int
 mypub(UNUSED int argc, void **argv)
 {
     UNUSED amqp_channel_t *chan;
@@ -126,7 +110,6 @@ run(UNUSED int argc, UNUSED void **argv)
     int res;
     amqp_channel_t *chan;
     amqp_consumer_t *cons;
-    UNUSED mrkthr_ctx_t *cons_thread;
 
     res = 0;
     conn = amqp_conn_new("localhost",
@@ -238,13 +221,28 @@ test1(void)
 int
 main(void)
 {
+#ifdef DO_MEMDEBUG
+    MEMDEBUG_REGISTER(array);
+    MEMDEBUG_REGISTER(bytes);
+    MEMDEBUG_REGISTER(bytestream);
+    MEMDEBUG_REGISTER(mrkamqp);
+    MEMDEBUG_REGISTER(mrkamqp_wire);
+    MEMDEBUG_REGISTER(mrkamqp_frame);
+    MEMDEBUG_REGISTER(mrkamqp_spec);
+    MEMDEBUG_REGISTER(mrkamqp_rpc);
+    MEMDEBUG_REGISTER(mrkamqp_testfoo);
+#endif
+
     if (signal(SIGINT, myterm) == SIG_ERR) {
         return 1;
     }
     if (signal(SIGTERM, myterm) == SIG_ERR) {
         return 1;
     }
-    test0();
     test1();
+#ifdef DO_MEMDEBUG
+    //memdebug_print_stats_oneline();
+    memdebug_print_stats();
+#endif
     return 0;
 }

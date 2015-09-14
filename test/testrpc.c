@@ -74,11 +74,11 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
         amqp_conn_destroy(&conn);
         _shutdown();
     } else {
+        TRACE("Exiting (sigshutdown)...");
 #ifdef DO_MEMDEBUG
         //memdebug_print_stats_oneline();
         memdebug_print_stats();
 #endif
-        TRACE("Exiting (sigshutdown)...");
         exit(0);
     }
     return 0;

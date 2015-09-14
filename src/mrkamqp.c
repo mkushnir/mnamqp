@@ -954,6 +954,8 @@ amqp_conn_destroy(amqp_conn_t **conn)
     if (*conn != NULL) {
         amqp_frame_t *fr;
 
+        (*conn)->chan0 = NULL;
+
         amqp_conn_close_fd(*conn);
 
         array_fini(&(*conn)->channels);
@@ -1057,6 +1059,7 @@ channel_expect_method(amqp_channel_t *chan,
                 CTRACE("expected method: %s, found: %s",
                       mi->name,
                       (*fr)->payload.params->mi->name);
+                amqp_frame_destroy(fr);
                 res = CHANNEL_EXPECT_METHOD + 2;
                 goto err;
             }

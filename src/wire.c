@@ -1112,6 +1112,7 @@ mrkamqp_init(void)
         ty->tag = _typeinfo[i].tag;
         ty->enc = _typeinfo[i].enc;
         ty->dec = _typeinfo[i].dec;
+        ty->kill = _typeinfo[i].kill;
     }
     amqp_spec_init();
 }
