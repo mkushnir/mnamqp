@@ -4,7 +4,7 @@ MEMDEBUG_DECLARE(mrkamqp_spec);
 #endif
 
 #include <mrkcommon/bytestream.h>
-#include <mrkcommon/dict.h>
+#include <mrkcommon/hash.h>
 //#define TRRET_DEBUG
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
@@ -13,7 +13,7 @@ MEMDEBUG_DECLARE(mrkamqp_spec);
 
 #include "diag.h"
 
-dict_t methods;
+hash_t methods;
 
 
 #define FPACK(ty, name) pack_##ty(&conn->outs, m->name)
@@ -151,7 +151,7 @@ DEC(connection_start,
     FUNPACK(longstr, locales);
 )
 FINI(connection_start,
-    dict_fini(&m->server_properties);
+    hash_fini(&m->server_properties);
     BYTES_DECREF(&m->mechanisms);
     BYTES_DECREF(&m->locales);
 )
@@ -185,7 +185,7 @@ DEC(connection_start_ok,
     FUNPACK(shortstr, locale);
 )
 FINI(connection_start_ok,
-    dict_fini(&m->client_properties);
+    hash_fini(&m->client_properties);
     BYTES_DECREF(&m->mechanism);
     BYTES_DECREF(&m->response);
     BYTES_DECREF(&m->locale);
@@ -577,7 +577,7 @@ DEC(exchange_declare,
 FINI(exchange_declare,
     BYTES_DECREF(&m->exchange);
     BYTES_DECREF(&m->type);
-    dict_fini(&m->arguments);
+    hash_fini(&m->arguments);
 )
 
 
@@ -670,7 +670,7 @@ DEC(queue_declare,
 )
 FINI(queue_declare,
     BYTES_DECREF(&m->queue);
-    dict_fini(&m->arguments);
+    hash_fini(&m->arguments);
 )
 
 
@@ -741,7 +741,7 @@ FINI(queue_bind,
     BYTES_DECREF(&m->queue);
     BYTES_DECREF(&m->exchange);
     BYTES_DECREF(&m->routing_key);
-    dict_fini(&m->arguments);
+    hash_fini(&m->arguments);
 )
 
 
@@ -889,7 +889,7 @@ FINI(queue_unbind,
     BYTES_DECREF(&m->queue);
     BYTES_DECREF(&m->exchange);
     BYTES_DECREF(&m->routing_key);
-    dict_fini(&m->arguments);
+    hash_fini(&m->arguments);
 )
 
 
@@ -984,7 +984,7 @@ DEC(basic_consume,
 FINI(basic_consume,
     BYTES_DECREF(&m->queue);
     BYTES_DECREF(&m->consumer_tag);
-    dict_fini(&m->arguments);
+    hash_fini(&m->arguments);
 )
 
 
@@ -1444,11 +1444,11 @@ static amqp_method_info_t _methinfo[] = {
 amqp_method_info_t *
 amqp_method_info_get(amqp_meth_id_t mid)
 {
-    dict_item_t *dit;
+    hash_item_t *dit;
     amqp_method_info_t *mi;
 
     mi = NULL;
-    if ((dit = dict_get_item(&methods, (void *)(uintptr_t)mid)) != NULL) {
+    if ((dit = hash_get_item(&methods, (void *)(uintptr_t)mid)) != NULL) {
         mi = dit->value;
     }
     return mi;
@@ -1461,10 +1461,10 @@ amqp_meth_params_decode(amqp_conn_t *conn,
                         amqp_meth_params_t **params)
 {
     int res;
-    dict_item_t *dit;
+    hash_item_t *dit;
     amqp_method_info_t *mi;
 
-    if ((dit = dict_get_item(&methods, (void *)(uintptr_t)mid)) == NULL) {
+    if ((dit = hash_get_item(&methods, (void *)(uintptr_t)mid)) == NULL) {
         TRACE("invalid mid %016lx", mid);
         TRRET(AMQP_METH_PARAMS_DECODE + 1);
     }
@@ -1598,7 +1598,7 @@ amqp_header_destroy(amqp_header_t **header)
     if (*header != NULL) {
         BYTES_DECREF(&(*header)->content_type);
         BYTES_DECREF(&(*header)->content_encoding);
-        dict_fini(&(*header)->headers);
+        hash_fini(&(*header)->headers);
         BYTES_DECREF(&(*header)->correlation_id);
         BYTES_DECREF(&(*header)->reply_to);
         BYTES_DECREF(&(*header)->expiration);
@@ -1708,7 +1708,7 @@ amqp_header_set_headers(amqp_header_t *header,
                         amqp_value_t *value)
 {
     header->flags |= AMQP_HEADER_FHEADERS;
-    dict_set_item(&header->headers, key, value);
+    hash_set_item(&header->headers, key, value);
 }
 
 AMQP_HEADER_SET(delivery_mode, DELIVERY_MODE, uint8_t)
@@ -1739,16 +1739,16 @@ amqp_spec_init(void)
 {
     size_t i;
 
-    dict_init(&methods, 101,
-              (dict_hashfn_t)method_info_hash,
-              (dict_item_comparator_t)method_info_cmp,
+    hash_init(&methods, 101,
+              (hash_hashfn_t)method_info_hash,
+              (hash_item_comparator_t)method_info_cmp,
               NULL);
 
     for (i = 0; i < countof(_methinfo); ++i) {
         amqp_method_info_t *mi;
 
         mi = &_methinfo[i];
-        dict_set_item(&methods, (void *)(uintptr_t)mi->mid, mi);
+        hash_set_item(&methods, (void *)(uintptr_t)mi->mid, mi);
     }
 }
 
@@ -1756,5 +1756,5 @@ amqp_spec_init(void)
 void
 amqp_spec_fini(void)
 {
-    dict_fini(&methods);
+    hash_fini(&methods);
 }

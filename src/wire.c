@@ -18,7 +18,7 @@
 MEMDEBUG_DECLARE(mrkamqp_wire);
 #endif
 
-#include <mrkcommon/dict.h>
+#include <mrkcommon/hash.h>
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/bytes.h>
 #include <mrkcommon/dumpm.h>
@@ -406,7 +406,7 @@ pack_table_cb( bytes_t *key,
 
 
 void
-pack_table(bytestream_t *bs, dict_t *v)
+pack_table(bytestream_t *bs, hash_t *v)
 {
     struct {
         bytestream_t *bs;
@@ -421,8 +421,8 @@ pack_table(bytestream_t *bs, dict_t *v)
     seod0 = SEOD(bs);
     pack_long(bs, 0); // placeholder
     seod1 = SEOD(bs);
-    (void)dict_traverse(v,
-                        (dict_traverser_t)pack_table_cb,
+    (void)hash_traverse(v,
+                        (hash_traverser_t)pack_table_cb,
                         &params);
     u.c = SDATA(bs, seod0);
     *u.i = htobe32((uint32_t)SEOD(bs) - seod1);
@@ -430,12 +430,12 @@ pack_table(bytestream_t *bs, dict_t *v)
 
 
 void
-init_table(dict_t *v)
+init_table(hash_t *v)
 {
-    dict_init(v, 17,
-             (dict_hashfn_t)bytes_hash,
-             (dict_item_comparator_t)bytes_cmp,
-             (dict_item_finalizer_t)table_item_fini);
+    hash_init(v, 17,
+             (hash_hashfn_t)bytes_hash,
+             (hash_item_comparator_t)bytes_cmp,
+             (hash_item_finalizer_t)table_item_fini);
 
 }
 
@@ -445,7 +445,7 @@ TABLE_ADD_REF(n, ty_)                                          \
 {                                                              \
     bytes_t *k;                                                \
     k = bytes_new_from_str(key);                               \
-    if (dict_get_item(v, k) != NULL) {                         \
+    if (hash_get_item(v, k) != NULL) {                         \
         BYTES_DECREF(&k);                                      \
         return 1;                                              \
     } else {                                                   \
@@ -456,7 +456,7 @@ TABLE_ADD_REF(n, ty_)                                          \
         }                                                      \
         vv->ty = amqp_type_by_tag(tag);                        \
         vv->value.vname = val;                                 \
-        dict_set_item(v, k, vv);                               \
+        hash_set_item(v, k, vv);                               \
     }                                                          \
     return 0;                                                  \
 }                                                              \
@@ -480,17 +480,17 @@ TABLE_ADD_DEF(lstr, bytes_t *, AMQP_TLSTR, str)
 
 
 int
-table_add_value(dict_t *v, const char *key, amqp_value_t *val)
+table_add_value(hash_t *v, const char *key, amqp_value_t *val)
 {
     bytes_t *k;
 
     k = bytes_new_from_str(key);
 
-    if (dict_get_item(v, k) != NULL) {
+    if (hash_get_item(v, k) != NULL) {
         BYTES_DECREF(&k);
         return 1;
     } else {
-        dict_set_item(v, k, val);
+        hash_set_item(v, k, val);
     }
     return 0;
 }
@@ -571,13 +571,13 @@ table_str_cb(bytes_t *key, amqp_value_t *val, bytestream_t *bs)
 }
 
 void
-table_str(dict_t *v, bytestream_t *bs)
+table_str(hash_t *v, bytestream_t *bs)
 {
     off_t eod;
 
     bytestream_cat(bs, 1, "{");
     eod = SEOD(bs);
-    dict_traverse(v, (dict_traverser_t)table_str_cb, bs);
+    hash_traverse(v, (hash_traverser_t)table_str_cb, bs);
     if (eod < SEOD(bs)) {
         SADVANCEEOD(bs, -1);
     }
@@ -586,7 +586,7 @@ table_str(dict_t *v, bytestream_t *bs)
 
 
 ssize_t
-unpack_table(bytestream_t *bs, int fd, dict_t *v)
+unpack_table(bytestream_t *bs, int fd, hash_t *v)
 {
     uint32_t sz;
     ssize_t nread;
@@ -618,11 +618,11 @@ unpack_table(bytestream_t *bs, int fd, dict_t *v)
         nread += n;
 
         /* ignore dups */
-        if (dict_get_item(v, key) != NULL) {
+        if (hash_get_item(v, key) != NULL) {
             BYTES_DECREF(&key);
             amqp_value_destroy(&value);
         } else {
-            dict_set_item(v, key, value);
+            hash_set_item(v, key, value);
         }
         //if (nread >= sz) {
         //    break;
@@ -1000,7 +1000,7 @@ dec_table(amqp_value_t *v, bytestream_t *bs, int fd)
 static void
 kill_table(amqp_value_t *v)
 {
-    dict_fini(&v->value.t);
+    hash_fini(&v->value.t);
 }
 
 

@@ -5,7 +5,7 @@
 #include <mrkcommon/array.h>
 #include <mrkcommon/bytes.h>
 #include <mrkcommon/bytestream.h>
-#include <mrkcommon/dict.h>
+#include <mrkcommon/hash.h>
 #include <mrkcommon/stqueue.h>
 
 #include <mrkthr.h>
@@ -76,7 +76,7 @@ typedef struct _amqp_value {
         amqp_decimal_t dc;
         bytes_t *str;
         array_t a;
-        dict_t t;
+        hash_t t;
     } value;
 } amqp_value_t;
 
@@ -229,14 +229,14 @@ void amqp_##mname##_fini(amqp_meth_params_t *);                        \
 MPARAMS(connection_start,
     uint8_t version_major;
     uint8_t version_minor;
-    dict_t server_properties;
+    hash_t server_properties;
     bytes_t *mechanisms;
     bytes_t *locales;
 )
 
 
 MPARAMS(connection_start_ok,
-    dict_t client_properties;
+    hash_t client_properties;
     bytes_t *mechanism;
     bytes_t *response;
     bytes_t *locale;
@@ -362,7 +362,7 @@ MPARAMS(exchange_declare,
      * 4 nowait
      */
     uint8_t flags;
-    dict_t arguments;
+    hash_t arguments;
 )
 
 
@@ -401,7 +401,7 @@ MPARAMS(queue_declare,
      * 4 nowait
      */
     uint8_t flags;
-    dict_t arguments;
+    hash_t arguments;
 )
 
 
@@ -421,7 +421,7 @@ MPARAMS(queue_bind,
      * 0 nowait
      */
     uint8_t flags;
-    dict_t arguments;
+    hash_t arguments;
 )
 
 
@@ -466,7 +466,7 @@ MPARAMS(queue_unbind,
     bytes_t *queue;
     bytes_t *exchange;
     bytes_t *routing_key;
-    dict_t arguments;
+    hash_t arguments;
 )
 
 
@@ -502,7 +502,7 @@ MPARAMS(basic_consume,
      * 3 nowait
      */
     uint8_t flags;
-    dict_t arguments;
+    hash_t arguments;
 )
 
 
@@ -652,9 +652,9 @@ void pack_shortstr(bytestream_t *, bytes_t *);
 ssize_t unpack_shortstr(bytestream_t *, int, bytes_t **);
 void pack_longstr(bytestream_t *, bytes_t *);
 ssize_t unpack_longstr(bytestream_t *, int, bytes_t **);
-void pack_table(bytestream_t *, dict_t *);
-ssize_t unpack_table(bytestream_t *, int, dict_t *);
-void init_table(dict_t *);
+void pack_table(bytestream_t *, hash_t *);
+ssize_t unpack_table(bytestream_t *, int, hash_t *);
+void init_table(hash_t *);
 
 int amqp_decode_table(bytestream_t *, int, amqp_value_t **);
 amqp_value_t *amqp_value_new(uint8_t);
@@ -662,7 +662,7 @@ void amqp_value_destroy(amqp_value_t **);
 
 
 #define TABLE_ADD_REF(n, ty_)                          \
-int table_add_##n(dict_t *v, const char *key, ty_ val) \
+int table_add_##n(hash_t *v, const char *key, ty_ val) \
 
 
 TABLE_ADD_REF(bool, char);
@@ -678,8 +678,8 @@ TABLE_ADD_REF(float, float);
 TABLE_ADD_REF(double, double);
 TABLE_ADD_REF(sstr, bytes_t *);
 TABLE_ADD_REF(lstr, bytes_t *);
-int table_add_value(dict_t *, const char *, amqp_value_t *);
-void table_str(dict_t *, bytestream_t *);
+int table_add_value(hash_t *, const char *, amqp_value_t *);
+void table_str(hash_t *, bytestream_t *);
 
 
 /*

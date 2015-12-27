@@ -326,10 +326,10 @@ next_frame(amqp_conn_t *conn)
              */
             if (fr->payload.params->mi->mid == AMQP_BASIC_DELIVER) {
                 amqp_basic_deliver_t *m;
-                dict_item_t *dit;
+                hash_item_t *dit;
 
                 m = (amqp_basic_deliver_t *)fr->payload.params;
-                if ((dit = dict_get_item(&(*chan)->consumers,
+                if ((dit = hash_get_item(&(*chan)->consumers,
                                          m->consumer_tag)) == NULL) {
                     CTRACE("got basic.deliver to %s, "
                            "cannot find, discarding frame",
@@ -924,8 +924,8 @@ channel_stop_threads_cb(amqp_channel_t **chan, UNUSED void *udata)
         mrkthr_signal_error(&(*chan)->iframe_sig, 0x80);
         (void)mrkthr_join((*chan)->iframe_sig.owner);
     }
-    (void)dict_traverse(&(*chan)->consumers,
-                        (dict_traverser_t)consumer_stop_threads_cb, NULL);
+    (void)hash_traverse(&(*chan)->consumers,
+                        (hash_traverser_t)consumer_stop_threads_cb, NULL);
     return 0;
 }
 
@@ -1006,10 +1006,10 @@ amqp_channel_new(amqp_conn_t *conn)
     (*chan)->id = conn->channels.elnum - 1;
     STQUEUE_INIT(&(*chan)->iframes);
     mrkthr_signal_init(&(*chan)->iframe_sig, NULL);
-    dict_init(&(*chan)->consumers, 17,
-              (dict_hashfn_t)bytes_hash,
-              (dict_item_comparator_t)bytes_cmp,
-              (dict_item_finalizer_t)amqp_consumer_item_fini);
+    hash_init(&(*chan)->consumers, 17,
+              (hash_hashfn_t)bytes_hash,
+              (hash_item_comparator_t)bytes_cmp,
+              (hash_item_finalizer_t)amqp_consumer_item_fini);
     (*chan)->content_consumer = NULL;
     (*chan)->publish_tag = 0ll;
     STQUEUE_INIT(&(*chan)->pending_pub);
@@ -1098,7 +1098,7 @@ amqp_channel_destroy(amqp_channel_t **chan)
         if (mrkthr_signal_has_owner(&(*chan)->iframe_sig)) {
             mrkthr_signal_fini(&(*chan)->iframe_sig);
         }
-        dict_fini(&(*chan)->consumers);
+        hash_fini(&(*chan)->consumers);
         free(*chan);
         *chan = NULL;
     }
@@ -1695,8 +1695,8 @@ amqp_close_channel(amqp_channel_t *chan)
         goto end;
     }
 
-    (void)dict_traverse(&chan->consumers,
-                        (dict_traverser_t)close_consumer_cb, NULL);
+    (void)hash_traverse(&chan->consumers,
+                        (hash_traverser_t)close_consumer_cb, NULL);
 
     // >>> channel_close
     fr1 = amqp_frame_new(chan->id, AMQP_FMETHOD);
@@ -1791,7 +1791,7 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
                              const char *consumer_tag,
                              uint8_t flags)
 {
-    dict_item_t *dit;
+    hash_item_t *dit;
     amqp_consumer_t *cons;
     amqp_frame_t *fr0, *fr1;
     amqp_basic_consume_t *m;
@@ -1839,11 +1839,11 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
         cons->consumer_tag = ctag; // nref = 1;
     }
 
-    if ((dit = dict_get_item(&chan->consumers, cons->consumer_tag)) != NULL) {
+    if ((dit = hash_get_item(&chan->consumers, cons->consumer_tag)) != NULL) {
         TR(CHANNEL_CREATE_CONSUMER + 3);
         goto err;
     }
-    dict_set_item(&chan->consumers, cons->consumer_tag, cons);
+    hash_set_item(&chan->consumers, cons->consumer_tag, cons);
 
 end:
     amqp_frame_destroy_method(&fr0);

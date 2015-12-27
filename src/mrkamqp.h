@@ -4,7 +4,7 @@
 #include <mrkcommon/array.h>
 #include <mrkcommon/bytes.h>
 #include <mrkcommon/bytestream.h>
-#include <mrkcommon/dict.h>
+#include <mrkcommon/hash.h>
 #include <mrkcommon/stqueue.h>
 
 #include <mrkthr.h>
@@ -55,7 +55,7 @@ typedef struct _amqp_channel {
     /* incoming frames */
     STQUEUE(_amqp_frame, iframes);
     mrkthr_signal_t iframe_sig;
-    dict_t consumers;
+    hash_t consumers;
     /* weak ref */
     struct _amqp_consumer *content_consumer;
     uint64_t publish_tag;
@@ -117,7 +117,7 @@ typedef struct _amqp_header {
     uint16_t flags;
     bytes_t *content_type;
     bytes_t *content_encoding;
-    dict_t headers;
+    hash_t headers;
     uint8_t delivery_mode;
     uint8_t priority;
     bytes_t *correlation_id;
@@ -150,7 +150,7 @@ typedef struct _amqp_rpc {
     amqp_channel_t *chan;
     amqp_consumer_t *cons;
     /* key weakref, value weakref */
-    dict_t calls;
+    hash_t calls;
     uint64_t next_id;
     amqp_consumer_content_cb_t cb;
     amqp_rpc_server_handler_t server_handler;

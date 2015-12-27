@@ -52,11 +52,11 @@ amqp_rpc_new(char *exchange,
     }
     rpc->chan = NULL;
     rpc->cons = NULL;
-    dict_init(&rpc->calls,
+    hash_init(&rpc->calls,
               101,
-              (dict_hashfn_t)bytes_hash,
-              (dict_item_comparator_t)bytes_cmp,
-              (dict_item_finalizer_t)rpc_call_item_fini);
+              (hash_hashfn_t)bytes_hash,
+              (hash_item_comparator_t)bytes_cmp,
+              (hash_item_finalizer_t)rpc_call_item_fini);
     rpc->next_id = 0ll;
     rpc->cb = NULL;
 
@@ -68,7 +68,7 @@ void
 amqp_rpc_destroy(amqp_rpc_t **rpc)
 {
     if ((*rpc) != NULL) {
-        dict_fini(&(*rpc)->calls);
+        hash_fini(&(*rpc)->calls);
         free((*rpc)->exchange);
         free((*rpc)->routing_key);
         BYTES_DECREF(&(*rpc)->reply_to);
@@ -212,9 +212,9 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
     rpc = udata;
 
     if (header->payload.header->correlation_id != NULL) {
-        dict_item_t *dit;
+        hash_item_t *dit;
 
-        if ((dit = dict_get_item(&rpc->calls,
+        if ((dit = hash_get_item(&rpc->calls,
                                  header->payload.header->correlation_id)) == NULL) {
             CTRACE("no pending call for correlation_id %s, ignoring",
                   (char *)header->payload.header->correlation_id->data);
@@ -330,8 +330,8 @@ amqp_rpc_call(amqp_rpc_t *rpc,
     cc.data = NULL;
     cc.sz = 0;
     mrkthr_signal_init(&cc.sig, mrkthr_me());
-    assert(dict_get_item(&rpc->calls, params.cid) == NULL);
-    dict_set_item(&rpc->calls, params.cid, &cc);
+    assert(hash_get_item(&rpc->calls, params.cid) == NULL);
+    hash_set_item(&rpc->calls, params.cid, &cc);
 
     if (amqp_channel_publish(rpc->chan,
                              rpc->exchange,
@@ -356,7 +356,7 @@ amqp_rpc_call(amqp_rpc_t *rpc,
     *sz = cc.sz;
 
 end:
-    dict_remove_item(&rpc->calls, params.cid);
+    hash_remove_item(&rpc->calls, params.cid);
     BYTES_DECREF(&params.cid); // nref 0
     mrkthr_signal_fini(&cc.sig);
     return res;
