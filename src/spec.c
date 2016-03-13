@@ -1693,8 +1693,19 @@ amqp_header_enc(amqp_header_t *m, struct _amqp_conn *conn)
 #define AMQP_HEADER_SET(n, f, ty)                      \
 AMQP_HEADER_SET_DECL(n, ty)                            \
 {                                                      \
+    assert(!(header->flags & AMQP_HEADER_F##f));       \
     header->flags |= AMQP_HEADER_F##f;                 \
     header->n = v;                                     \
+}                                                      \
+
+
+#define AMQP_HEADER_SETB(n, f)                         \
+AMQP_HEADER_SET_DECL(n, bytes_t *)                     \
+{                                                      \
+    assert(!(header->flags & AMQP_HEADER_F##f));       \
+    header->flags |= AMQP_HEADER_F##f;                 \
+    header->n = v;                                     \
+    BYTES_INCREF(v) ;                                  \
 }                                                      \
 
 
@@ -1707,6 +1718,7 @@ amqp_header_set_headers(amqp_header_t *header,
                         bytes_t *key,
                         amqp_value_t *value)
 {
+    assert(!(header->flags & AMQP_HEADER_FHEADERS));
     header->flags |= AMQP_HEADER_FHEADERS;
     hash_set_item(&header->headers, key, value);
 }
@@ -1715,23 +1727,23 @@ AMQP_HEADER_SET(delivery_mode, DELIVERY_MODE, uint8_t)
 
 AMQP_HEADER_SET(priority, PRIORITY, uint8_t)
 
-AMQP_HEADER_SET(correlation_id, CORRELATION_ID, bytes_t *)
+AMQP_HEADER_SETB(correlation_id, CORRELATION_ID)
 
-AMQP_HEADER_SET(reply_to, REPLY_TO, bytes_t *)
+AMQP_HEADER_SETB(reply_to, REPLY_TO)
 
-AMQP_HEADER_SET(expiration, EXPIRATION, bytes_t *)
+AMQP_HEADER_SETB(expiration, EXPIRATION)
 
-AMQP_HEADER_SET(message_id, MESSAGE_ID, bytes_t *)
+AMQP_HEADER_SETB(message_id, MESSAGE_ID)
 
 AMQP_HEADER_SET(timestamp, TIMESTAMP, uint64_t)
 
-AMQP_HEADER_SET(type, TYPE, bytes_t *)
+AMQP_HEADER_SETB(type, TYPE)
 
-AMQP_HEADER_SET(user_id, USER_ID, bytes_t *)
+AMQP_HEADER_SETB(user_id, USER_ID)
 
-AMQP_HEADER_SET(app_id, APP_ID, bytes_t *)
+AMQP_HEADER_SETB(app_id, APP_ID)
 
-AMQP_HEADER_SET(cluster_id, CLUSTER_ID, bytes_t *)
+AMQP_HEADER_SETB(cluster_id, CLUSTER_ID)
 
 
 void

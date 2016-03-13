@@ -69,11 +69,19 @@ amqp_conn_new(const char *host,
         FAIL("malloc");
     }
 
-    conn->host = strdup(host);
+    if ((conn->host = strdup(host)) == NULL) {
+        FAIL("strdup");
+    }
     conn->port = port;
-    conn->user = strdup(user);
-    conn->password = strdup(password);
-    conn->vhost = strdup(vhost);
+    if ((conn->user = strdup(user)) == NULL) {
+        FAIL("strdup");
+    }
+    if ((conn->password = strdup(password)) == NULL) {
+        FAIL("strdup");
+    }
+    if ((conn->vhost = strdup(vhost)) == NULL) {
+        FAIL("strdup");
+    }
     conn->channel_max = channel_max;
     conn->heartbeat = heartbeat;
     conn->frame_max = frame_max;
@@ -1772,6 +1780,7 @@ amqp_consumer_destroy(amqp_consumer_t **cons)
         }
         STQUEUE_FINI(&(*cons)->pending_content);
         free(*cons);
+        *cons = NULL;
     }
 }
 

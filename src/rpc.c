@@ -39,11 +39,17 @@ amqp_rpc_new(char *exchange,
     }
 
     if (exchange != NULL) {
-        rpc->exchange = strdup(exchange);
+        if ((rpc->exchange = strdup(exchange)) == NULL) {
+            FAIL("strdup");
+        }
     } else {
-        rpc->exchange = strdup("");
+        if ((rpc->exchange = strdup("")) == NULL) {
+            FAIL("strdup");
+        }
     }
-    rpc->routing_key = strdup(routing_key);
+    if((rpc->routing_key = strdup(routing_key)) == NULL) {
+        FAIL("strdup");
+    }
     if (reply_to != NULL) {
         rpc->reply_to = bytes_new_from_str(reply_to);
         BYTES_INCREF(rpc->reply_to);
@@ -75,6 +81,7 @@ amqp_rpc_destroy(amqp_rpc_t **rpc)
         (*rpc)->chan = NULL;
         (void)amqp_rpc_teardown(*rpc);
         free(*rpc);
+        *rpc = NULL;
     }
 }
 

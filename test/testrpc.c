@@ -101,6 +101,8 @@ void usage(char *path)
 }
 
 
+bytes_t _testrpc = BYTES_INITIALIZER("testrpc");
+
 static void
 myhandler(UNUSED const amqp_header_t *hin,
           UNUSED const char *din,
@@ -110,6 +112,8 @@ myhandler(UNUSED const amqp_header_t *hin,
 {
 #define MYDLEN 32
     *hout = amqp_header_new();
+    AMQP_HEADER_SET_REF(app_id)(*hout, &_testrpc);
+    AMQP_HEADER_SET_REF(cluster_id)(*hout, &_testrpc);
     (*hout)->body_size = MYDLEN;
     (*dout) = malloc(MYDLEN);
     (void)snprintf(*dout, MYDLEN, "OK");
