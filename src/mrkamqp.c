@@ -774,7 +774,7 @@ amqp_conn_run(amqp_conn_t *conn)
                    bytes_new_from_str(PACKAGE_URL));
     caps = amqp_value_new(AMQP_TTABLE);
     init_table(&caps->value.t);
-    table_add_bool(&caps->value.t, "publisher_confirms", 1);
+    table_add_boolean(&caps->value.t, "publisher_confirms", 1);
     table_add_value(&start_ok->client_properties,
                     "capabilities",
                     caps);

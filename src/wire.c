@@ -464,7 +464,7 @@ TABLE_ADD_REF(n, ty_)                                          \
 /*
  * quick add some scalars to table
  */
-TABLE_ADD_DEF(bool, char, AMQP_TBOOL, b)
+TABLE_ADD_DEF(boolean, char, AMQP_TBOOL, b)
 TABLE_ADD_DEF(i8, int8_t, AMQP_TINT8, i8)
 TABLE_ADD_DEF(u8, uint8_t, AMQP_TUINT8, u8)
 TABLE_ADD_DEF(i16, int16_t, AMQP_TINT16, i16)
@@ -703,7 +703,7 @@ unpack_array(bytestream_t *bs, int fd, array_t *v)
  */
 
 /*
- * bool
+ * boolean
  */
 static void
 enc_bool(amqp_value_t *v, bytestream_t *bs)

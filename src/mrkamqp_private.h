@@ -665,7 +665,7 @@ void amqp_value_destroy(amqp_value_t **);
 int table_add_##n(hash_t *v, const char *key, ty_ val) \
 
 
-TABLE_ADD_REF(bool, char);
+TABLE_ADD_REF(boolean, char);
 TABLE_ADD_REF(i8, int8_t);
 TABLE_ADD_REF(u8, uint8_t);
 TABLE_ADD_REF(i16, int16_t);
