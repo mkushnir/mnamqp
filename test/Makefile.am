@@ -5,11 +5,11 @@ CLEANFILES = *.core
 noinst_PROGRAMS=testfoo testpubsub testrpc
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/test
-dist_HEADERS = unittest.h
+dist_HEADERS =
 
 BUILT_SOURCES = ../src/diag.c ../src/diag.h
 
-noinst_HEADERS = ../src/mrkamqp.h
+noinst_HEADERS = unittest.h ../src/mrkamqp.h
 
 if DEBUG
 DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
