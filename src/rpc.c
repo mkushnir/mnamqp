@@ -126,7 +126,8 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
             /* take header over, no free() on the handler side */
             callback_header = NULL;
         } else {
-            CTRACE("server handler returned NULL callback header, discarding reply");
+            CTRACE("server handler returned NULL callback header, "
+                   "discarding reply");
         }
     } else {
         amqp_header_destroy(&callback_header);
@@ -222,7 +223,7 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
         hash_item_t *dit;
 
         if ((dit = hash_get_item(&rpc->calls,
-                                 header->payload.header->correlation_id)) == NULL) {
+                        header->payload.header->correlation_id)) == NULL) {
             CTRACE("no pending call for correlation_id %s, ignoring",
                   (char *)header->payload.header->correlation_id->data);
             if (data != NULL) {
@@ -300,6 +301,8 @@ rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
     struct {
         bytes_t *reply_to;
         bytes_t *cid;
+        void (*header_ucb)(amqp_header_t *, void *);
+        void *header_udata;
     } *params;
 
     params = udata;
@@ -310,12 +313,17 @@ rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
     BYTES_INCREF(params->reply_to); // nref +1
     AMQP_HEADER_SET_REF(correlation_id)(header, params->cid);
     BYTES_INCREF(params->cid); // nref +1
+    if (params->header_ucb != NULL) {
+        params->header_ucb(header, params->header_udata);
+    }
 }
 
 
 int
 amqp_rpc_call(amqp_rpc_t *rpc,
               bytes_t *request,
+              void (*header_ucb)(amqp_header_t *, void *),
+              void *header_udata,
               char **reply,
               size_t *sz,
               uint64_t timeout)
@@ -324,14 +332,16 @@ amqp_rpc_call(amqp_rpc_t *rpc,
     struct {
         bytes_t *reply_to;
         bytes_t *cid;
+        void (*header_ucb)(amqp_header_t *, void *);
+        void *header_udata;
     } params;
-
     rpc_call_completion_t cc;
-
 
     res = 0;
     params.reply_to = rpc->reply_to;
     params.cid = bytes_printf("%016lx", ++rpc->next_id);
+    params.header_ucb = header_ucb;
+    params.header_udata = header_udata;
     BYTES_INCREF(params.cid); // nref 1
     cc.rpc = rpc;
     cc.data = NULL;

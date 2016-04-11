@@ -22,7 +22,7 @@
 #include <netinet/ip.h> // IPTOS_LOWDELAY
 
 #include <mrkcommon/bytestream.h>
-#define TRRET_DEBUG_VERBOSE
+//#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/stqueue.h>
 #include <mrkcommon/util.h>

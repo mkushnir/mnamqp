@@ -158,7 +158,7 @@ run_conn(void)
             request = bytes_printf("test %ld", mrkthr_get_now());
             reply = NULL;
             sz = 0;
-            res = amqp_rpc_call(rpc, request, &reply, &sz, 2000);
+            res = amqp_rpc_call(rpc, request, NULL, NULL, &reply, &sz, 2000);
             BYTES_DECREF(&request);
             D8(reply, sz);
             if (reply != NULL) {
