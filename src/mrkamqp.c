@@ -111,6 +111,14 @@ amqp_conn_open(amqp_conn_t *conn)
     struct addrinfo hints, *ainfos, *ai;
     char portstr[32];
 
+    if (!conn->closed) {
+        TRRET(AMQP_CONN_OPEN + 1);
+    }
+
+    if (conn->fd >- 0) {
+        TRRET(AMQP_CONN_OPEN + 2);
+    }
+
     snprintf(portstr, sizeof(portstr), "%d", conn->port);
     memset(&hints, 0, sizeof(hints));
     //hints.ai_family = PF_INET;
@@ -119,7 +127,7 @@ amqp_conn_open(amqp_conn_t *conn)
 
     ainfos = NULL;
     if (getaddrinfo(conn->host, portstr, &hints, &ainfos) != 0) {
-        TRRET(AMQP_CONN_OPEN + 1);
+        TRRET(AMQP_CONN_OPEN + 3);
     }
 
     for (ai = ainfos; ai != NULL; ai = ai->ai_next) {
@@ -151,7 +159,7 @@ amqp_conn_open(amqp_conn_t *conn)
         //}
 
         if (mrkthr_connect(conn->fd, ai->ai_addr, ai->ai_addrlen) != 0) {
-            TRRET(AMQP_CONN_OPEN + 2);
+            TRRET(AMQP_CONN_OPEN + 4);
         }
 
         break;
@@ -160,7 +168,7 @@ amqp_conn_open(amqp_conn_t *conn)
     freeaddrinfo(ainfos);
 
     if (conn->fd < 0) {
-        TRRET(AMQP_CONN_OPEN + 3);
+        TRRET(AMQP_CONN_OPEN + 5);
     }
 
     conn->closed = 0;
