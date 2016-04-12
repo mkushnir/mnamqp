@@ -496,6 +496,18 @@ table_add_value(hash_t *v, const char *key, amqp_value_t *val)
 }
 
 
+amqp_value_t *
+table_get_value(hash_t *v, bytes_t *key)
+{
+    hash_item_t *hit;
+
+    if ((hit = hash_get_item(v, key)) == NULL) {
+        return NULL;
+    }
+    return hit->value;
+}
+
+
 static int
 table_str_cb(bytes_t *key, amqp_value_t *val, bytestream_t *bs)
 {

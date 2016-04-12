@@ -400,7 +400,7 @@ amqp_rpc_teardown(amqp_rpc_t *rpc)
 
 
 static int
-amqp_rpc_run_spwan_worker(UNUSED int argc, void **argv)
+amqp_rpc_run_spawn_worker(UNUSED int argc, void **argv)
 {
     amqp_rpc_t *rpc;
 
@@ -415,7 +415,7 @@ amqp_rpc_run_spawn(amqp_rpc_t *rpc)
 {
     assert(rpc->cons != NULL);
     assert(rpc->cb != NULL);
-    return mrkthr_spawn("rpcspawn", amqp_rpc_run_spwan_worker, 1, rpc);
+    return mrkthr_spawn("rpcspawn", amqp_rpc_run_spawn_worker, 1, rpc);
 }
 
 int

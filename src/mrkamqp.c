@@ -22,7 +22,7 @@
 #include <netinet/ip.h> // IPTOS_LOWDELAY
 
 #include <mrkcommon/bytestream.h>
-//#define TRRET_DEBUG_VERBOSE
+#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/stqueue.h>
 #include <mrkcommon/util.h>
@@ -61,7 +61,8 @@ amqp_conn_new(const char *host,
               const char *vhost,
               short channel_max,
               int frame_max,
-              short heartbeat)
+              short heartbeat,
+              int capabilities)
 {
     amqp_conn_t *conn;
 
@@ -86,6 +87,7 @@ amqp_conn_new(const char *host,
     conn->heartbeat = heartbeat;
     conn->frame_max = frame_max;
     conn->payload_max = frame_max = 8;
+    conn->capabilities = capabilities;
 
     conn->fd = -1;
     bytestream_init(&conn->ins, 65536);
@@ -734,6 +736,8 @@ send_raw_octets(amqp_conn_t *conn, uint8_t *octets, size_t sz)
 }
 
 
+static bytes_t _capabilities = BYTES_INITIALIZER("capabilities");
+
 int
 amqp_conn_run(amqp_conn_t *conn)
 {
@@ -741,11 +745,15 @@ amqp_conn_run(amqp_conn_t *conn)
 
     char greeting[] = {'A', 'M', 'Q', 'P', 0x00, 0x00, 0x09, 0x01};
     amqp_frame_t *fr0, *fr1;
+    amqp_connection_start_t *_start; //weakref
+    hash_t *hisprops; //weakref
+    UNUSED amqp_value_t *hiscaps; //weakref
     amqp_connection_start_ok_t *start_ok;
     amqp_connection_tune_t *tune;
     amqp_connection_tune_ok_t *tune_ok;
     amqp_connection_open_t *opn;
-    amqp_value_t *caps;
+    amqp_value_t *mycaps;
+
     size_t sz0, sz1;
 
     res = 0;
@@ -766,7 +774,9 @@ amqp_conn_run(amqp_conn_t *conn)
         res = AMQP_CONN_RUN + 1;
         goto err;
     }
-    amqp_frame_destroy_method(&fr0);
+    _start = (amqp_connection_start_t *)fr0->payload.params;
+    hisprops = &_start->server_properties;
+    hiscaps = table_get_value(hisprops, &_capabilities);
 
     // >>> connection_start_ok
     fr1 = amqp_frame_new(conn->chan0->id, AMQP_FMETHOD);
@@ -780,12 +790,18 @@ amqp_conn_run(amqp_conn_t *conn)
     table_add_lstr(&start_ok->client_properties,
                    "information",
                    bytes_new_from_str(PACKAGE_URL));
-    caps = amqp_value_new(AMQP_TTABLE);
-    init_table(&caps->value.t);
-    table_add_boolean(&caps->value.t, "publisher_confirms", 1);
+
+    mycaps = amqp_value_new(AMQP_TTABLE);
+    init_table(&mycaps->value.t);
+    if (conn->capabilities & AMQP_CAP_PUBLISHER_CONFIRMS) {
+        table_add_boolean(&mycaps->value.t, "publisher_confirms", 1);
+    }
+    if (conn->capabilities & AMQP_CAP_CONSUMER_CANCEL_NOTIFY) {
+        table_add_boolean(&mycaps->value.t, "consumer_cancel_notify", 1);
+    }
     table_add_value(&start_ok->client_properties,
                     "capabilities",
-                    caps);
+                    mycaps);
     start_ok->mechanism = bytes_new_from_str("PLAIN");
     sz0 = strlen(conn->user);
     sz1 = strlen(conn->password);
@@ -798,6 +814,8 @@ amqp_conn_run(amqp_conn_t *conn)
     fr1->payload.params = (amqp_meth_params_t *)start_ok;
     channel_send_frame(conn->chan0, fr1);
     fr1 = NULL;
+
+    amqp_frame_destroy_method(&fr0);
 
     // <<< connection_tune
     if (channel_expect_method(conn->chan0, AMQP_CONNECTION_TUNE, &fr0) != 0) {

@@ -26,6 +26,7 @@ typedef struct _amqp_conn {
     uint32_t frame_max;
     uint32_t payload_max;
     uint16_t heartbeat;
+    int capabilities;
     uint64_t since_last_frame;
 
     int fd;
@@ -161,6 +162,8 @@ typedef struct _amqp_rpc {
 /*
  * conn
  */
+#define AMQP_CAP_PUBLISHER_CONFIRMS (0x01)
+#define AMQP_CAP_CONSUMER_CANCEL_NOTIFY (0x02)
 amqp_conn_t *amqp_conn_new(const char *,
                            int,
                            const char *,
@@ -168,7 +171,8 @@ amqp_conn_t *amqp_conn_new(const char *,
                            const char *,
                            short,
                            int,
-                           short);
+                           short,
+                           int);
 void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
 int amqp_conn_run(amqp_conn_t *);
@@ -345,6 +349,7 @@ int amqp_rpc_call(amqp_rpc_t *,
 void mrkamqp_init(void);
 void mrkamqp_fini(void);
 
+const char *mrkamqp_diag_str(int);
 
 #ifdef __cplusplus
 }

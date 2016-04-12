@@ -187,7 +187,7 @@ run_conn(void)
         }
     }
 
-    amqp_rpc_teardown(rpc);
+    (void)amqp_rpc_teardown(rpc);
 
     amqp_rpc_destroy(&rpc);
 
@@ -211,7 +211,7 @@ create_conn(void)
 
     res = 0;
 
-    conn = amqp_conn_new("10.1.2.10", 5672, user, password, vhost, 0, 0, 0);
+    conn = amqp_conn_new("10.1.2.10", 5672, user, password, vhost, 0, 0, 0, AMQP_CAP_PUBLISHER_CONFIRMS);
 
     if (amqp_conn_open(conn) != 0) {
         res = 1;

@@ -233,7 +233,7 @@ create_conn(void)
 
     res = 0;
 
-    conn = amqp_conn_new("localhost", 5672, user, password, vhost, 0, 0, 0);
+    conn = amqp_conn_new("localhost", 5672, user, password, vhost, 0, 0, 0, AMQP_CAP_PUBLISHER_CONFIRMS);
 
     if (amqp_conn_open(conn) != 0) {
         res = 1;

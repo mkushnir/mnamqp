@@ -5,7 +5,7 @@ MEMDEBUG_DECLARE(mrkamqp_spec);
 
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/hash.h>
-//#define TRRET_DEBUG
+#define TRRET_DEBUG
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 

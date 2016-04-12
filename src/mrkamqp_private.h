@@ -682,6 +682,8 @@ int table_add_value(hash_t *, const char *, amqp_value_t *);
 void table_str(hash_t *, bytestream_t *);
 
 
+amqp_value_t *table_get_value(hash_t *, bytes_t *);
+
 /*
  * frame API
  */

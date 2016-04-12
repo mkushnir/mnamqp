@@ -119,6 +119,7 @@ run(UNUSED int argc, UNUSED void **argv)
                          "/",
                          0,
                          0,
+                         0,
                          0);
 
     if (amqp_conn_open(conn) != 0) {
