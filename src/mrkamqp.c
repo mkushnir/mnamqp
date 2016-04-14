@@ -385,7 +385,7 @@ next_frame(amqp_conn_t *conn)
                             mrkthr_signal_send(&pp->sig);
                             break;
                         } else {
-                            TRACE("got baskc.ack deliver_tag=%ld "
+                            TRACE("got basic.ack deliver_tag=%ld "
                                   "expected >=%ld",
                                   m->delivery_tag, pp->publish_tag);
                             mrkthr_signal_error(&pp->sig, 0x80);
@@ -393,7 +393,7 @@ next_frame(amqp_conn_t *conn)
                     }
 
                     if (pp == NULL) {
-                        TRACE("got baskc.ack deliver_tag=%ld none expected",
+                        TRACE("got basic.ack deliver_tag=%ld none expected",
                               m->delivery_tag);
                     }
 
@@ -405,12 +405,12 @@ next_frame(amqp_conn_t *conn)
                         if (pp->publish_tag == m->delivery_tag) {
                             mrkthr_signal_send(&pp->sig);
                         } else {
-                            TRACE("got baskc.ack deliver_tag=%ld expected %ld",
+                            TRACE("got basic.ack deliver_tag=%ld expected %ld",
                                   m->delivery_tag, pp->publish_tag);
                             mrkthr_signal_error(&pp->sig, 0x80);
                         }
                     } else {
-                        TRACE("got baskc.ack deliver_tag=%ld none expected",
+                        TRACE("got basic.ack deliver_tag=%ld none expected",
                               m->delivery_tag);
                     }
                 }

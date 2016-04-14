@@ -1709,9 +1709,9 @@ AMQP_HEADER_SET_DECL(n, bytes_t *)                     \
 }                                                      \
 
 
-AMQP_HEADER_SET(content_type, CONTENT_TYPE, bytes_t *)
+AMQP_HEADER_SETB(content_type, CONTENT_TYPE)
 
-AMQP_HEADER_SET(content_encoding, CONTENT_ENCODING, bytes_t *)
+AMQP_HEADER_SETB(content_encoding, CONTENT_ENCODING)
 
 void
 amqp_header_set_headers(amqp_header_t *header,
