@@ -321,11 +321,12 @@ rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
 
 int
 amqp_rpc_call(amqp_rpc_t *rpc,
-              bytes_t *request,
+              const char *request,
+              size_t sz,
               void (*header_ucb)(amqp_header_t *, void *),
               void *header_udata,
               char **reply,
-              size_t *sz,
+              size_t *rsz,
               uint64_t timeout)
 {
     int res;
@@ -356,8 +357,8 @@ amqp_rpc_call(amqp_rpc_t *rpc,
                              0,
                              rpc_call_header_completion_cb,
                              &params, // nref +- 1
-                             (char *)request->data,
-                             request->sz) != 0) {
+                             (char *)request,
+                             sz) != 0) {
         res = AMQP_RPC_CALL + 1;
         goto err;
     }
@@ -370,7 +371,7 @@ amqp_rpc_call(amqp_rpc_t *rpc,
     }
 
     *reply = cc.data;
-    *sz = cc.sz;
+    *rsz = cc.sz;
 
 end:
     hash_remove_item(&rpc->calls, params.cid);
@@ -392,7 +393,9 @@ amqp_rpc_teardown(amqp_rpc_t *rpc)
 
     res = 0;
     if (rpc->cons != NULL) {
-        (void)amqp_close_consumer(rpc->cons);
+        if ((res = amqp_close_consumer(rpc->cons)) != 0) {
+            TR(res);
+        }
         rpc->cons = NULL;
     }
     return res;

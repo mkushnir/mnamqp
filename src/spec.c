@@ -5,7 +5,7 @@ MEMDEBUG_DECLARE(mrkamqp_spec);
 
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/hash.h>
-#define TRRET_DEBUG
+//#define TRRET_DEBUG
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
@@ -1709,19 +1709,34 @@ AMQP_HEADER_SET_DECL(n, bytes_t *)                     \
 }                                                      \
 
 
+
+#define AMQP_HEADER_SETH(n, ty_)                               \
+AMQP_HEADER_SETH_DECL(n, ty_)                                  \
+{                                                              \
+    header->flags |= AMQP_HEADER_FHEADERS;                     \
+    (void)table_add_ ## n(&header->headers, key, val);         \
+}                                                              \
+
+
 AMQP_HEADER_SETB(content_type, CONTENT_TYPE)
 
 AMQP_HEADER_SETB(content_encoding, CONTENT_ENCODING)
 
-void
-amqp_header_set_headers(amqp_header_t *header,
-                        bytes_t *key,
-                        amqp_value_t *value)
-{
-    assert(!(header->flags & AMQP_HEADER_FHEADERS));
-    header->flags |= AMQP_HEADER_FHEADERS;
-    hash_set_item(&header->headers, key, value);
-}
+AMQP_HEADER_SETH(boolean, char)
+AMQP_HEADER_SETH(i8, int8_t)
+AMQP_HEADER_SETH(u8, uint8_t)
+AMQP_HEADER_SETH(i16, int16_t)
+AMQP_HEADER_SETH(u16, uint16_t)
+AMQP_HEADER_SETH(i32, int32_t)
+AMQP_HEADER_SETH(u32, uint32_t)
+AMQP_HEADER_SETH(i64, int64_t)
+AMQP_HEADER_SETH(u64, uint64_t)
+AMQP_HEADER_SETH(float, float)
+AMQP_HEADER_SETH(double, double)
+// RabbitMQ doesn't like short str?
+//AMQP_HEADER_SETH(sstr, bytes_t *)
+AMQP_HEADER_SETH(lstr, bytes_t *)
+
 
 AMQP_HEADER_SET(delivery_mode, DELIVERY_MODE, uint8_t)
 

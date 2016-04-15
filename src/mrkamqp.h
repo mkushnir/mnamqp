@@ -40,6 +40,8 @@ typedef struct _amqp_conn {
 
     array_t channels;
     struct _amqp_channel *chan0;
+    uint16_t error_code;
+    bytes_t *error_msg;
     int closed:1;
 } amqp_conn_t;
 
@@ -178,6 +180,7 @@ int amqp_conn_open(amqp_conn_t *);
 int amqp_conn_run(amqp_conn_t *);
 mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
 int amqp_conn_close(amqp_conn_t *);
+void amqp_conn_close_hard(amqp_conn_t *);
 
 
 /*
@@ -303,13 +306,33 @@ void amqp_header_destroy(amqp_header_t **);
 void amqp_header_dump(amqp_header_t *);
 
 #define AMQP_HEADER_SET_REF(n) amqp_header_set_##n
+#define AMQP_HEADER_SETH_REF(n) amqp_header_set_headers_add_##n
 
 #define AMQP_HEADER_SET_DECL(n, ty)                            \
 void AMQP_HEADER_SET_REF(n)(amqp_header_t *header, ty v)       \
 
+
+#define AMQP_HEADER_SETH_DECL(n, ty)                                           \
+void AMQP_HEADER_SETH_REF(n)(amqp_header_t *header, const char *key, ty val)   \
+
+
 AMQP_HEADER_SET_DECL(content_type, bytes_t *);
 AMQP_HEADER_SET_DECL(content_encoding, bytes_t *);
-void amqp_header_set_headers(amqp_header_t *, bytes_t *, amqp_value_t *);
+
+AMQP_HEADER_SETH_DECL(boolean, char);
+AMQP_HEADER_SETH_DECL(i8, int8_t);
+AMQP_HEADER_SETH_DECL(u8, uint8_t);
+AMQP_HEADER_SETH_DECL(i16, int16_t);
+AMQP_HEADER_SETH_DECL(u16, uint16_t);
+AMQP_HEADER_SETH_DECL(i32, int32_t);
+AMQP_HEADER_SETH_DECL(u32, uint32_t);
+AMQP_HEADER_SETH_DECL(i64, int64_t);
+AMQP_HEADER_SETH_DECL(u64, uint64_t);
+AMQP_HEADER_SETH_DECL(float, float);
+AMQP_HEADER_SETH_DECL(double, double);
+AMQP_HEADER_SETH_DECL(sstr, bytes_t *);
+AMQP_HEADER_SETH_DECL(lstr, bytes_t *);
+
 AMQP_HEADER_SET_DECL(delivery_mode, uint8_t);
 AMQP_HEADER_SET_DECL(priority, uint8_t);
 AMQP_HEADER_SET_DECL(correlation_id, bytes_t *);
@@ -336,7 +359,8 @@ int amqp_rpc_setup_server(amqp_rpc_t *,
 int amqp_rpc_run(amqp_rpc_t *);
 int amqp_rpc_teardown(amqp_rpc_t *);
 int amqp_rpc_call(amqp_rpc_t *,
-                  bytes_t *,
+                  const char *,
+                  size_t,
                   void (*)(amqp_header_t *, void *),
                   void *,
                   char **,

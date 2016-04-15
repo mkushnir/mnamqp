@@ -676,7 +676,8 @@ TABLE_ADD_REF(i64, int64_t);
 TABLE_ADD_REF(u64, uint64_t);
 TABLE_ADD_REF(float, float);
 TABLE_ADD_REF(double, double);
-TABLE_ADD_REF(sstr, bytes_t *);
+// RabbitMQ doesn't like short str?
+//TABLE_ADD_REF(sstr, bytes_t *);
 TABLE_ADD_REF(lstr, bytes_t *);
 int table_add_value(hash_t *, const char *, amqp_value_t *);
 void table_str(hash_t *, bytestream_t *);

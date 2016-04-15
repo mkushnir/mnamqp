@@ -304,9 +304,12 @@ pack_longstr(bytestream_t *bs, bytes_t *s)
         char c;
     } u;
 
-    u.sz = htobe32((uint32_t)s->sz);
+    u.sz = htobe32((uint32_t)s->sz - 1);
+    /*
+     * discard terminating zero, not to be counted in AMQP
+     */
     (void)bytestream_cat(bs, sizeof(uint32_t), &u.c);
-    (void)bytestream_cat(bs, s->sz, (char *)s->data);
+    (void)bytestream_cat(bs, s->sz - 1, (char *)s->data);
 }
 
 
@@ -319,7 +322,10 @@ unpack_longstr(bytestream_t *bs, int fd, bytes_t **v)
         TRRET(UNPACK_ECONSUME);
     }
 
-    *v = bytes_new(sz);
+    /*
+     * reserve for terminating zero, not to be counted in AMQP
+     */
+    *v = bytes_new(sz + 1);
 
     while (SAVAIL(bs) < (ssize_t)sz) {
         if (bytestream_consume_data(bs, fd) != 0) {
@@ -328,6 +334,7 @@ unpack_longstr(bytestream_t *bs, int fd, bytes_t **v)
     }
 
     memcpy((*v)->data, SPDATA(bs), sz);
+    (*v)->data[sz] = '\0';
     SADVANCEPOS(bs, sz);
     BYTES_INCREF(*v);
     return sizeof(uint32_t) + sz;
@@ -475,7 +482,8 @@ TABLE_ADD_DEF(i64, int64_t, AMQP_TINT64, i64)
 TABLE_ADD_DEF(u64, uint64_t, AMQP_TUINT64, u64)
 TABLE_ADD_DEF(float, float, AMQP_TFLOAT, f)
 TABLE_ADD_DEF(double, double, AMQP_TDOUBLE, d)
-TABLE_ADD_DEF(sstr, bytes_t *, AMQP_TSSTR, str)
+// RabbitMQ doesn't like short str?
+//TABLE_ADD_DEF(sstr, bytes_t *, AMQP_TSSTR, str)
 TABLE_ADD_DEF(lstr, bytes_t *, AMQP_TLSTR, str)
 
 
