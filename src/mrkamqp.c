@@ -22,6 +22,7 @@
 #include <netinet/ip.h> // IPTOS_LOWDELAY
 
 #include <mrkcommon/bytestream.h>
+//#define TRRET_DEBUG
 //#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/stqueue.h>
@@ -416,7 +417,7 @@ next_frame(amqp_conn_t *conn)
                             CTRACE("got basic.ack deliver_tag=%ld "
                                    "expected >=%ld",
                                    m->delivery_tag, pp->publish_tag);
-                            mrkthr_signal_error(&pp->sig, 0x80);
+                            mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
                         }
                     }
 
@@ -435,7 +436,7 @@ next_frame(amqp_conn_t *conn)
                         } else {
                             CTRACE("got basic.ack deliver_tag=%ld expected %ld",
                                    m->delivery_tag, pp->publish_tag);
-                            mrkthr_signal_error(&pp->sig, 0x80);
+                            mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
                         }
                     } else {
                         CTRACE("got basic.ack deliver_tag=%ld none expected",
@@ -712,11 +713,6 @@ recv_thread(UNUSED int argc, void **argv)
         conn->since_last_frame = mrkthr_get_now();
     }
 
-    //TRACE("Starting cleanup...");
-    /* clear myself first */
-    conn->recv_thread = NULL;
-    amqp_conn_stop_threads(conn);
-    amqp_conn_close_fd(conn);
     //TRACE("Exiting recv_tread ...");
     return 0;
 }
@@ -975,7 +971,7 @@ consumer_stop_threads_cb(UNUSED bytes_t *key,
 {
     cons->closed = 1;
     if (mrkthr_signal_has_owner(&cons->content_sig)) {
-        mrkthr_signal_error(&cons->content_sig, 0x80);
+        mrkthr_signal_error(&cons->content_sig, MRKAMQP_STOP_THREADS);
     }
     if (cons->content_thread != NULL) {
         (void)mrkthr_join(cons->content_thread);
@@ -989,7 +985,7 @@ channel_stop_threads_cb(amqp_channel_t **chan, UNUSED void *udata)
 {
     (*chan)->closed = 1;
     if (mrkthr_signal_has_owner(&(*chan)->iframe_sig)) {
-        mrkthr_signal_error(&(*chan)->iframe_sig, 0x80);
+        mrkthr_signal_error(&(*chan)->iframe_sig, MRKAMQP_STOP_THREADS);
         (void)mrkthr_join((*chan)->iframe_sig.owner);
     }
     (void)hash_traverse(&(*chan)->consumers,
@@ -1002,7 +998,7 @@ static void
 amqp_conn_stop_threads(amqp_conn_t *conn)
 {
     if (mrkthr_signal_has_owner(&conn->oframe_sig)) {
-        mrkthr_signal_error(&conn->oframe_sig, 0x80);
+        mrkthr_signal_error(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
         (void)mrkthr_join(conn->oframe_sig.owner);
     }
     //if (conn->send_thread != NULL) {
@@ -1026,7 +1022,7 @@ amqp_conn_destroy(amqp_conn_t **conn)
 
         (*conn)->chan0 = NULL;
 
-        amqp_conn_close_fd(*conn);
+        amqp_conn_close_fd(*conn); //sanity
 
         array_fini(&(*conn)->channels);
         while ((fr = STQUEUE_HEAD(&(*conn)->oframes)) != NULL) {

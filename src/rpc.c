@@ -6,6 +6,7 @@ MEMDEBUG_DECLARE(mrkamqp_rpc);
 #endif
 
 #include <mrkcommon/bytestream.h>
+//#define TRRET_DEBUG
 //#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
@@ -20,7 +21,7 @@ rpc_call_item_fini(UNUSED bytes_t *key, void *value) {
     rpc_call_completion_t *cc;
 
     cc = value;
-    mrkthr_signal_error(&cc->sig, 0x80);
+    mrkthr_signal_error(&cc->sig, MRKAMQP_STOP_THREADS);
     return 0;
 }
 

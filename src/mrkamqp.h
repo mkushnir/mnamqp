@@ -346,6 +346,8 @@ AMQP_HEADER_SET_DECL(app_id, bytes_t *);
 AMQP_HEADER_SET_DECL(cluster_id, bytes_t *);
 
 
+#define MRKAMQP_STOP_THREADS (-128)
+#define MRKAMQP_PROTOCOL_ERROR (-129)
 /*
  * rpc
  */
