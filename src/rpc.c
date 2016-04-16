@@ -15,6 +15,15 @@ MEMDEBUG_DECLARE(mrkamqp_rpc);
 
 #include "diag.h"
 
+
+typedef struct _rpc_call_completion {
+    mrkthr_signal_t sig;
+    struct _amqp_rpc *rpc;
+    amqp_consumer_content_cb_t response_cb;
+    void *udata;
+} rpc_call_completion_t;
+
+
 static int
 rpc_call_item_fini(UNUSED bytes_t *key, void *value) {
 
@@ -65,7 +74,7 @@ amqp_rpc_new(char *exchange,
               (hash_item_comparator_t)bytes_cmp,
               (hash_item_finalizer_t)rpc_call_item_fini);
     rpc->next_id = 0ll;
-    rpc->cb = NULL;
+    rpc->cccb = NULL;
 
     return rpc;
 }
@@ -90,12 +99,13 @@ amqp_rpc_destroy(amqp_rpc_t **rpc)
 /*
  * server
  */
-static void
+static int
 amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
                    amqp_frame_t *header,
                    char *data,
                    void *udata)
 {
+    int res;
     amqp_rpc_t *rpc;
     amqp_header_t *callback_header;
     char *callback_data;
@@ -110,6 +120,9 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
                         &callback_header,
                         &callback_data,
                         rpc->server_udata);
+
+    res = 0;
+
     if (header->payload.header->reply_to != NULL) {
         if (callback_header != NULL) {
             if (header->payload.header->correlation_id != NULL) {
@@ -118,7 +131,7 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
                 BYTES_INCREF(header->payload.header->correlation_id);
             }
             callback_header->class_id = AMQP_BASIC;
-            (void)amqp_channel_publish_ex(
+            res = amqp_channel_publish_ex(
                     rpc->chan,
                     rpc->exchange,
                     (char *)header->payload.header->reply_to->data,
@@ -141,6 +154,7 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
     if (data != NULL) {
         free(data);
     }
+    return res;
 }
 
 
@@ -177,7 +191,7 @@ amqp_rpc_setup_server(amqp_rpc_t *rpc,
         res = AMQP_RPC_SETUP_SERVER + 3;
         goto err;
     }
-    rpc->cb = amqp_rpc_server_cb;
+    rpc->cccb = amqp_rpc_server_cb;
     rpc->server_handler = server_handler;
     rpc->server_udata = server_udata;
 
@@ -210,16 +224,18 @@ amqp_rpc_setup_client_cb0(UNUSED amqp_channel_t *chan,
 }
 
 
-static void
+static int
 amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
                    amqp_frame_t *header,
                    char *data,
                    void *udata)
 {
+    int res;
     amqp_rpc_t *rpc;
 
     rpc = udata;
 
+    res = 0;
     if (header->payload.header->correlation_id != NULL) {
         hash_item_t *dit;
 
@@ -234,8 +250,9 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
             rpc_call_completion_t *cc;
 
             cc = dit->value;
-            cc->data = data; /* passed over to */
-            cc->sz = header->payload.header->body_size;
+            if (cc->response_cb != NULL) {
+                res = cc->response_cb(method, header, data, cc->udata);
+            }
             mrkthr_signal_send(&cc->sig);
         }
     } else {
@@ -245,6 +262,7 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
             free(data);
         }
     }
+    return res;
 }
 
 
@@ -284,7 +302,7 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
         res = AMQP_RPC_SETUP_CLIENT + 3;
         goto err;
     }
-    rpc->cb = amqp_rpc_client_cb;
+    rpc->cccb = amqp_rpc_client_cb;
 
 end:
     return res;
@@ -302,7 +320,7 @@ rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
     struct {
         bytes_t *reply_to;
         bytes_t *cid;
-        void (*header_ucb)(amqp_header_t *, void *);
+        amqp_rpc_request_header_cb_t request_header_cb;
         void *header_udata;
     } *params;
 
@@ -314,8 +332,8 @@ rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
     BYTES_INCREF(params->reply_to); // nref +1
     AMQP_HEADER_SET_REF(correlation_id)(header, params->cid);
     BYTES_INCREF(params->cid); // nref +1
-    if (params->header_ucb != NULL) {
-        params->header_ucb(header, params->header_udata);
+    if (params->request_header_cb != NULL) {
+        params->request_header_cb(header, params->header_udata);
     }
 }
 
@@ -324,17 +342,16 @@ int
 amqp_rpc_call(amqp_rpc_t *rpc,
               const char *request,
               size_t sz,
-              void (*header_ucb)(amqp_header_t *, void *),
+              amqp_rpc_request_header_cb_t request_header_cb,
+              amqp_consumer_content_cb_t response_cb,
               void *header_udata,
-              char **reply,
-              size_t *rsz,
               uint64_t timeout)
 {
     int res;
     struct {
         bytes_t *reply_to;
         bytes_t *cid;
-        void (*header_ucb)(amqp_header_t *, void *);
+        amqp_rpc_request_header_cb_t request_header_cb;
         void *header_udata;
     } params;
     rpc_call_completion_t cc;
@@ -342,13 +359,13 @@ amqp_rpc_call(amqp_rpc_t *rpc,
     res = 0;
     params.reply_to = rpc->reply_to;
     params.cid = bytes_printf("%016lx", ++rpc->next_id);
-    params.header_ucb = header_ucb;
+    params.request_header_cb = request_header_cb;
     params.header_udata = header_udata;
     BYTES_INCREF(params.cid); // nref 1
-    cc.rpc = rpc;
-    cc.data = NULL;
-    cc.sz = 0;
     mrkthr_signal_init(&cc.sig, mrkthr_me());
+    cc.rpc = rpc;
+    cc.response_cb = response_cb;
+    cc.udata = header_udata;
     assert(hash_get_item(&rpc->calls, params.cid) == NULL);
     hash_set_item(&rpc->calls, params.cid, &cc);
 
@@ -370,9 +387,6 @@ amqp_rpc_call(amqp_rpc_t *rpc,
         }
         goto err;
     }
-
-    *reply = cc.data;
-    *rsz = cc.sz;
 
 end:
     hash_remove_item(&rpc->calls, params.cid);
@@ -410,7 +424,7 @@ amqp_rpc_run_spawn_worker(UNUSED int argc, void **argv)
 
     assert(argc == 1);
     rpc = argv[0];
-    return amqp_consumer_handle_content(rpc->cons, rpc->cb, rpc);
+    return amqp_consumer_handle_content(rpc->cons, rpc->cccb, rpc);
 }
 
 
@@ -418,7 +432,7 @@ mrkthr_ctx_t *
 amqp_rpc_run_spawn(amqp_rpc_t *rpc)
 {
     assert(rpc->cons != NULL);
-    assert(rpc->cb != NULL);
+    assert(rpc->cccb != NULL);
     return mrkthr_spawn("rpcspawn", amqp_rpc_run_spawn_worker, 1, rpc);
 }
 
@@ -426,8 +440,8 @@ int
 amqp_rpc_run(amqp_rpc_t *rpc)
 {
     assert(rpc->cons != NULL);
-    assert(rpc->cb != NULL);
-    return amqp_consumer_handle_content(rpc->cons, rpc->cb, rpc);
+    assert(rpc->cccb != NULL);
+    return amqp_consumer_handle_content(rpc->cons, rpc->cccb, rpc);
 }
 
 

@@ -1975,7 +1975,7 @@ content_thread_worker(UNUSED int argc, void **argv)
         }
 
         assert(cons->content_cb != NULL);
-        cons->content_cb(pc->method, pc->header, data, cons->content_udata);
+        res = cons->content_cb(pc->method, pc->header, data, cons->content_udata);
         data = NULL; /* passed over to content_cb() */
 
         if (!(cons->flags & CONSUME_FNOACK)) {

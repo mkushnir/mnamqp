@@ -102,7 +102,7 @@ void usage(char *path)
 }
 
 
-static void
+static int
 my_content_cb(UNUSED amqp_frame_t *method,
               UNUSED amqp_frame_t *header,
               char *data,
@@ -117,6 +117,7 @@ my_content_cb(UNUSED amqp_frame_t *method,
         free(data);
     }
     TRACEC("<");
+    return 0;
 }
 
 

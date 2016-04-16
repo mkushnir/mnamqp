@@ -76,10 +76,11 @@ typedef struct _amqp_pending_content {
     STQUEUE(_amqp_frame, body);
 } amqp_pending_content_t;
 
-typedef void (*amqp_consumer_content_cb_t)(amqp_frame_t *,
-                                           amqp_frame_t *,
-                                           char *,
-                                           void *);
+typedef int (*amqp_consumer_content_cb_t)(amqp_frame_t *,
+                                          amqp_frame_t *,
+                                          char *,
+                                          void *);
+
 typedef struct _amqp_consumer {
     amqp_channel_t *chan;
     bytes_t *consumer_tag;
@@ -145,6 +146,9 @@ typedef void (*amqp_rpc_server_handler_t)(const amqp_header_t *,
                                           amqp_header_t **,
                                           char **,
                                           void *);
+
+typedef void (*amqp_rpc_request_header_cb_t)(amqp_header_t *,
+                                             void *);
 typedef struct _amqp_rpc {
     char *exchange;
     char *routing_key;
@@ -155,7 +159,7 @@ typedef struct _amqp_rpc {
     /* key weakref, value weakref */
     hash_t calls;
     uint64_t next_id;
-    amqp_consumer_content_cb_t cb;
+    amqp_consumer_content_cb_t cccb;
     amqp_rpc_server_handler_t server_handler;
     void *server_udata;
 } amqp_rpc_t;
@@ -363,10 +367,9 @@ int amqp_rpc_teardown(amqp_rpc_t *);
 int amqp_rpc_call(amqp_rpc_t *,
                   const char *,
                   size_t,
-                  void (*)(amqp_header_t *, void *),
+                  amqp_rpc_request_header_cb_t,
+                  amqp_consumer_content_cb_t,
                   void *,
-                  char **,
-                  size_t *,
                   uint64_t);
 
 /*

@@ -776,16 +776,6 @@ int amqp_channel_unbind_queue_ex(struct _amqp_channel *,
                                  amqp_frame_completion_cb_t,
                                  void *);
 
-/*
- * rpc
- */
-typedef struct _rpc_call_completion {
-    mrkthr_signal_t sig;
-    struct _amqp_rpc *rpc;
-    char *data;
-    size_t sz;
-} rpc_call_completion_t;
-
 #ifdef __cplusplus
 }
 #endif

@@ -73,7 +73,7 @@ mypub(UNUSED int argc, void **argv)
 }
 
 
-static void
+static int
 my_content_cb(UNUSED amqp_frame_t *method,
               amqp_frame_t *header,
               char *data,
@@ -85,6 +85,7 @@ my_content_cb(UNUSED amqp_frame_t *method,
         free(data);
     }
     TRACE("---");
+    return 0;
 }
 
 

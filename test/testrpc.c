@@ -121,6 +121,20 @@ myhandler(UNUSED const amqp_header_t *hin,
 
 
 static int
+respcb(UNUSED amqp_frame_t *method,
+       amqp_frame_t *header,
+       char *data,
+       UNUSED void *udata)
+{
+    if (data != NULL) {
+        D8(data, header->payload.header->body_size);
+        free(data);
+    }
+    return 0;
+}
+
+
+static int
 run_conn(void)
 {
     int res;
@@ -149,28 +163,19 @@ run_conn(void)
         (void)amqp_rpc_run_spawn(rpc);
 
         while (!shutting_down) {
-            char *reply;
-            size_t sz;
             int res;
 
             bytes_t *request;
 
             request = bytes_printf("test %ld", mrkthr_get_now());
-            reply = NULL;
-            sz = 0;
             res = amqp_rpc_call(rpc,
                                 (char *)request->data,
                                 request->sz,
                                 NULL,
+                                respcb,
                                 NULL,
-                                &reply,
-                                &sz,
                                 2000);
             BYTES_DECREF(&request);
-            D8(reply, sz);
-            if (reply != NULL) {
-                free(reply);
-            }
             if (res != 0) {
                 if (res != MRKTHR_WAIT_TIMEOUT) {
                     CTRACE("breaking loop ...");
