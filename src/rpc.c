@@ -128,7 +128,6 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
             if (header->payload.header->correlation_id != NULL) {
                 AMQP_HEADER_SET_REF(correlation_id)(callback_header,
                         header->payload.header->correlation_id);
-                BYTES_INCREF(header->payload.header->correlation_id);
             }
             callback_header->class_id = AMQP_BASIC;
             res = amqp_channel_publish_ex(
@@ -218,7 +217,6 @@ amqp_rpc_setup_client_cb0(UNUSED amqp_channel_t *chan,
     /* transfer queue reference */
     m = (amqp_queue_declare_ok_t *)fr0->payload.params;
     rpc->reply_to = m->queue;
-    BYTES_INCREF(rpc->reply_to);
     m->queue = NULL;
 
 }
@@ -329,9 +327,7 @@ rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
     assert(params->cid != NULL);
 
     AMQP_HEADER_SET_REF(reply_to)(header, params->reply_to);
-    BYTES_INCREF(params->reply_to); // nref +1
     AMQP_HEADER_SET_REF(correlation_id)(header, params->cid);
-    BYTES_INCREF(params->cid); // nref +1
     if (params->request_header_cb != NULL) {
         params->request_header_cb(header, params->header_udata);
     }

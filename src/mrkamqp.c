@@ -50,7 +50,7 @@ static int channel_expect_method(amqp_channel_t *,
                                  amqp_frame_t **);
 static void channel_send_frame(amqp_channel_t *, amqp_frame_t *);
 static amqp_consumer_t *amqp_consumer_new(amqp_channel_t *, uint8_t);
-static int amqp_consumer_item_fini(void *, amqp_consumer_t *);
+static int amqp_consumer_item_fini(bytes_t *, amqp_consumer_t *);
 static amqp_pending_content_t *amqp_pending_content_new(void);
 static void amqp_pending_content_destroy(amqp_pending_content_t **);
 
@@ -257,8 +257,8 @@ amqp_pending_content_destroy(amqp_pending_content_t **pc)
     if (*pc != NULL) {
         amqp_frame_t *fr;
 
-        amqp_frame_destroy(&(*pc)->method);
-        amqp_frame_destroy(&(*pc)->header);
+        amqp_frame_destroy_method(&(*pc)->method);
+        amqp_frame_destroy_header(&(*pc)->header);
         while ((fr = STQUEUE_HEAD(&(*pc)->body)) != NULL) {
             STQUEUE_DEQUEUE(&(*pc)->body, link);
             STQUEUE_ENTRY_FINI(link, fr);
@@ -380,7 +380,7 @@ next_frame(amqp_conn_t *conn)
                                          m->consumer_tag)) == NULL) {
                     CTRACE("got basic.deliver to %s, "
                            "cannot find, discarding frame",
-                          m->consumer_tag->data);
+                           BDATA(m->consumer_tag));
                     amqp_frame_destroy_method(&fr);
 
                 } else {
@@ -1710,6 +1710,7 @@ amqp_channel_cancel(amqp_channel_t *chan,
                                     AMQP_CANCEL,
         assert(consumer_tag != NULL);
         m->consumer_tag = bytes_new_from_str(consumer_tag);
+        BYTES_INCREF(m->consumer_tag);
         m->flags = flags;,
     )
 }
@@ -1827,8 +1828,9 @@ amqp_consumer_destroy(amqp_consumer_t **cons)
 
 
 static int
-amqp_consumer_item_fini(UNUSED void *key, amqp_consumer_t *cons)
+amqp_consumer_item_fini(bytes_t *key, amqp_consumer_t *cons)
 {
+    BYTES_DECREF(&key);
     amqp_consumer_destroy(&cons);
     return 0;
 }
@@ -1870,7 +1872,7 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
     BYTES_INCREF(m->consumer_tag); //nref = 2
     m->flags = flags;
     fr1->payload.params = (amqp_meth_params_t *)m;
-    channel_send_frame(chan, fr1); //nref = 1
+    channel_send_frame(chan, fr1); //nref = 1 (delayed)
     fr1 = NULL;
 
     if (!(flags & CONSUME_FNOWAIT)) {
@@ -1884,9 +1886,9 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
         assert(ok->consumer_tag != NULL);
         cons->consumer_tag = ok->consumer_tag;
         ok->consumer_tag = NULL;
-        BYTES_DECREF(&ctag); //nref = 0
     } else {
-        cons->consumer_tag = ctag; // nref = 1;
+        cons->consumer_tag = ctag;
+        BYTES_INCREF(ctag); //nref = 2
     }
 
     if ((dit = hash_get_item(&chan->consumers, cons->consumer_tag)) != NULL) {
@@ -1894,8 +1896,10 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
         goto err;
     }
     hash_set_item(&chan->consumers, cons->consumer_tag, cons);
+    BYTES_INCREF(cons->consumer_tag); //nref = 3
 
 end:
+    BYTES_DECREF(&ctag); //nref = 2
     amqp_frame_destroy_method(&fr0);
     return cons;
 
@@ -2013,7 +2017,7 @@ amqp_consumer_handle_content_spawn(amqp_consumer_t *cons,
 {
     cons->content_cb = cb;
     cons->content_udata = udata;
-    cons->content_thread = mrkthr_spawn((char *)cons->consumer_tag->data,
+    cons->content_thread = mrkthr_spawn((char *)BDATA(cons->consumer_tag),
                                         content_thread_worker,
                                         1,
                                         cons);
@@ -2038,7 +2042,7 @@ amqp_close_consumer(amqp_consumer_t *cons)
     if (!cons->closed) {
         assert(cons->consumer_tag != NULL);
         if (amqp_channel_cancel(cons->chan,
-                                (const char *)cons->consumer_tag->data,
+                                (const char *)BDATA(cons->consumer_tag),
                                 0) != 0) {
             TR(AMQP_CLOSE_CONSUMER + 1);
         }

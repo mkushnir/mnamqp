@@ -464,6 +464,7 @@ TABLE_ADD_REF(n, ty_)                                          \
         vv->ty = amqp_type_by_tag(tag);                        \
         vv->value.vname = val;                                 \
         hash_set_item(v, k, vv);                               \
+        BYTES_INCREF(k);                                       \
     }                                                          \
     return 0;                                                  \
 }                                                              \
