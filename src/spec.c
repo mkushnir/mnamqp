@@ -6,6 +6,7 @@ MEMDEBUG_DECLARE(mrkamqp_spec);
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/hash.h>
 //#define TRRET_DEBUG
+//#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
@@ -98,9 +99,7 @@ amqp_##mname##_dec(UNUSED amqp_conn_t *conn,                   \
                    UNUSED amqp_meth_params_t **p)              \
 {                                                              \
     amqp_##mname##_t *m;                                       \
-    if ((m = malloc(sizeof(amqp_##mname##_t))) == NULL) {      \
-        FAIL("malloc");                                        \
-    }                                                          \
+    m = NEWREF(mname)();                                       \
     *p = (amqp_meth_params_t *)m;                              \
     __fields                                                   \
     return 0;                                                  \

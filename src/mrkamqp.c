@@ -52,7 +52,6 @@ static void channel_send_frame(amqp_channel_t *, amqp_frame_t *);
 static amqp_consumer_t *amqp_consumer_new(amqp_channel_t *, uint8_t);
 static int amqp_consumer_item_fini(bytes_t *, amqp_consumer_t *);
 static amqp_pending_content_t *amqp_pending_content_new(void);
-static void amqp_pending_content_destroy(amqp_pending_content_t **);
 
 amqp_conn_t *
 amqp_conn_new(const char *host,
@@ -694,7 +693,7 @@ pack_frame(amqp_conn_t *conn, amqp_frame_t *fr)
 
 
 static int
-recv_thread(UNUSED int argc, void **argv)
+recv_thread_worker(UNUSED int argc, void **argv)
 {
     amqp_conn_t *conn;
 
@@ -790,7 +789,7 @@ amqp_conn_run(amqp_conn_t *conn)
 
     conn->chan0 = amqp_channel_new(conn);
     assert(conn->chan0->id == 0);
-    conn->recv_thread = mrkthr_spawn("recvthr", recv_thread, 1, conn);
+    conn->recv_thread = mrkthr_spawn("recvthr", recv_thread_worker, 1, conn);
     mrkthr_set_prio(conn->recv_thread, 1);
     conn->send_thread = mrkthr_spawn("sendthr", send_thread_worker, 1, conn);
     mrkthr_set_prio(conn->send_thread, 1);
@@ -1695,10 +1694,6 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
 }
 
 
-/*
- * XXX
- * consumer
- */
 int
 amqp_channel_cancel(amqp_channel_t *chan,
                     const char *consumer_tag,

@@ -84,9 +84,6 @@ typedef int (*amqp_consumer_content_cb_t)(amqp_frame_t *,
 typedef struct _amqp_consumer {
     amqp_channel_t *chan;
     bytes_t *consumer_tag;
-    //amqp_frame_t *content_method;
-    //amqp_frame_t *content_header;
-    //STQUEUE(_amqp_frame, content_body);
     STQUEUE(_amqp_pending_content, pending_content);
     mrkthr_signal_t content_sig;
     mrkthr_ctx_t *content_thread;

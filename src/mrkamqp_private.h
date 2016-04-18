@@ -635,6 +635,7 @@ MPARAMS(basic_nack,
  * wire API
  */
 #define UNPACK_ECONSUME (-2)
+#define UNPACK_ETAG (-3)
 
 void pack_octet(bytestream_t *, uint8_t);
 ssize_t unpack_octet(bytestream_t *, int, uint8_t *);

@@ -106,9 +106,3 @@ amqp_frame_destroy(amqp_frame_t **fr)
         *fr = NULL;
     }
 }
-
-
-//int
-//amqp_send_frame()
-//{
-//}

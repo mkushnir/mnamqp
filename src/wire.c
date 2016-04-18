@@ -21,6 +21,8 @@ MEMDEBUG_DECLARE(mrkamqp_wire);
 #include <mrkcommon/hash.h>
 #include <mrkcommon/bytestream.h>
 #include <mrkcommon/bytes.h>
+//#define TRRET_DEBUG
+//#define TRRET_DEBUG_VERBOSE
 #include <mrkcommon/dumpm.h>
 #include <mrkcommon/util.h>
 
@@ -364,11 +366,11 @@ unpack_field_value(bytestream_t *bs, int fd, amqp_value_t **v)
         TRRET(UNPACK_ECONSUME);
     }
 
-    ty = amqp_type_by_tag(tag);
-
-    if (ty->tag != tag || ty->enc == NULL) {
-        TRRET(UNPACK_ECONSUME);
+    if ((ty = amqp_type_by_tag(tag)) == NULL) {
+        TRRET(UNPACK_ETAG);
     }
+
+    assert(ty->tag == tag || ty->enc != NULL);
 
     if (*v == NULL) {
         if ((*v = malloc(sizeof(amqp_value_t))) == NULL) {
@@ -378,7 +380,7 @@ unpack_field_value(bytestream_t *bs, int fd, amqp_value_t **v)
 
     (*v)->ty = ty;
 
-    if ((res1 = (*v)->ty->dec(*v, bs, fd)) < 0) {
+    if ((res1 = ty->dec(*v, bs, fd)) < 0) {
         TRRET(UNPACK_ECONSUME);
     }
     return res0 + res1;
@@ -461,7 +463,9 @@ TABLE_ADD_REF(n, ty_)                                          \
         if ((vv = malloc(sizeof(amqp_value_t))) == NULL) {     \
             FAIL("malloc");                                    \
         }                                                      \
-        vv->ty = amqp_type_by_tag(tag);                        \
+        if ((vv->ty = amqp_type_by_tag(tag)) == NULL) {        \
+            FAIL("table_add_" #n);                             \
+        }                                                      \
         vv->value.vname = val;                                 \
         hash_set_item(v, k, vv);                               \
         BYTES_INCREF(k);                                       \
@@ -615,8 +619,6 @@ unpack_table(bytestream_t *bs, int fd, hash_t *v)
     if (unpack_long(bs, fd, &sz) < 0) {
         TRRET(UNPACK_ECONSUME);
     }
-
-    init_table(v);
 
     nread = 0;
     while (nread < sz) {
@@ -1014,6 +1016,7 @@ enc_table(amqp_value_t *v, bytestream_t *bs)
 static ssize_t
 dec_table(amqp_value_t *v, bytestream_t *bs, int fd)
 {
+    init_table(&v->value.t);
     return unpack_table(bs, fd, &v->value.t);
 }
 
@@ -1072,26 +1075,10 @@ static struct {
 static amqp_type_t *
 amqp_type_by_tag(uint8_t tag)
 {
-    assert(field_types[tag].enc != NULL);
+    if (field_types[tag].enc == NULL) {
+        return NULL;
+    }
     return &field_types[tag];
-}
-
-
-int
-amqp_decode_table(bytestream_t *bs, int fd, amqp_value_t **v)
-{
-    if (*v == NULL) {
-        if ((*v = malloc(sizeof(amqp_value_t))) == NULL) {
-            FAIL("malloc");
-        }
-    }
-
-    (*v)->ty = amqp_type_by_tag(AMQP_TTABLE);
-
-    if ((*v)->ty->dec(*v, bs, fd) < 0) {
-        TRRET(AMQP_DECODE_TABLE + 1);
-    }
-    return 0;
 }
 
 
@@ -1103,7 +1090,9 @@ amqp_value_new(uint8_t tag)
     if ((res = malloc(sizeof(amqp_value_t))) == NULL) {
         FAIL("malloc");
     }
-    res->ty = amqp_type_by_tag(tag);
+    if ((res->ty = amqp_type_by_tag(tag)) == NULL) {
+        FAIL("amqp_table_new");
+    }
 
     return res;
 }
