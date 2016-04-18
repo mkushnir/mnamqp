@@ -359,13 +359,15 @@ amqp_rpc_call(amqp_rpc_t *rpc,
     res = 0;
     params.reply_to = rpc->reply_to;
     params.cid = bytes_printf("%016lx", ++rpc->next_id);
+    BYTES_INCREF(params.cid); // nref 1
     params.request_header_cb = request_header_cb;
     params.header_udata = header_udata;
-    BYTES_INCREF(params.cid); // nref 1
+
     mrkthr_signal_init(&cc.sig, mrkthr_me());
     cc.rpc = rpc;
     cc.response_cb = response_cb;
     cc.udata = header_udata;
+
     assert(hash_get_item(&rpc->calls, params.cid) == NULL);
     hash_set_item(&rpc->calls, params.cid, &cc);
 
