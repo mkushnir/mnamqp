@@ -58,6 +58,7 @@ typedef struct _amqp_channel {
     /* incoming frames */
     STQUEUE(_amqp_frame, iframes);
     mrkthr_signal_t iframe_sig;
+    mrkthr_sema_t sync_sema;
     hash_t consumers;
     /* weak ref */
     struct _amqp_consumer *content_consumer;
