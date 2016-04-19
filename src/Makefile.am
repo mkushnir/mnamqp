@@ -1,4 +1,5 @@
 AUTOMAKE_OPTIONS = foreign subdir-objects
+AM_MAKEFLAGS = -s
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/src
 dist_HEADERS =

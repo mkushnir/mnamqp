@@ -14,6 +14,8 @@
 extern "C" {
 #endif
 
+#define MRKAMQP_SYNC
+
 /*
  * wire
  */
@@ -748,34 +750,34 @@ void amqp_meth_params_destroy(amqp_meth_params_t **);
 typedef void (*amqp_frame_completion_cb_t)(struct _amqp_channel *,
                                            amqp_frame_t *,
                                            void *);
-int amqp_channel_declare_exchange_ex(struct _amqp_channel *,
-                                     const char *,
-                                     const char *,
-                                     uint8_t,
-                                     amqp_frame_completion_cb_t,
-                                     amqp_frame_completion_cb_t,
-                                     void *);
-int amqp_channel_declare_queue_ex(struct _amqp_channel *,
-                                  const char *,
-                                  uint8_t,
-                                  amqp_frame_completion_cb_t,
-                                  amqp_frame_completion_cb_t,
-                                  void *);
-int amqp_channel_bind_queue_ex(struct _amqp_channel *,
-                               const char *,
-                               const char *,
-                               const char *,
-                               uint8_t,
-                               amqp_frame_completion_cb_t,
-                               amqp_frame_completion_cb_t,
-                               void *udata);
-int amqp_channel_unbind_queue_ex(struct _amqp_channel *,
-                                 const char *,
-                                 const char *,
-                                 const char *,
-                                 amqp_frame_completion_cb_t,
-                                 amqp_frame_completion_cb_t,
-                                 void *);
+MRKAMQP_SYNC int amqp_channel_declare_exchange_ex(struct _amqp_channel *,
+                                                  const char *,
+                                                  const char *,
+                                                  uint8_t,
+                                                  amqp_frame_completion_cb_t,
+                                                  amqp_frame_completion_cb_t,
+                                                  void *);
+MRKAMQP_SYNC int amqp_channel_declare_queue_ex(struct _amqp_channel *,
+                                               const char *,
+                                               uint8_t,
+                                               amqp_frame_completion_cb_t,
+                                               amqp_frame_completion_cb_t,
+                                               void *);
+MRKAMQP_SYNC int amqp_channel_bind_queue_ex(struct _amqp_channel *,
+                                            const char *,
+                                            const char *,
+                                            const char *,
+                                            uint8_t,
+                                            amqp_frame_completion_cb_t,
+                                            amqp_frame_completion_cb_t,
+                                            void *udata);
+MRKAMQP_SYNC int amqp_channel_unbind_queue_ex(struct _amqp_channel *,
+                                              const char *,
+                                              const char *,
+                                              const char *,
+                                              amqp_frame_completion_cb_t,
+                                              amqp_frame_completion_cb_t,
+                                              void *);
 
 #ifdef __cplusplus
 }
