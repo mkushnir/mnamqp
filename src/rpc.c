@@ -133,7 +133,7 @@ amqp_rpc_server_cb(UNUSED amqp_frame_t *method,
             res = amqp_channel_publish_ex(
                     rpc->chan,
                     rpc->exchange,
-                    (char *)header->payload.header->reply_to->data,
+                    (char *)BDATA(header->payload.header->reply_to),
                     0,
                     callback_header, callback_data);
             /* take header over, no free() on the handler side */
@@ -240,7 +240,7 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
         if ((dit = hash_get_item(&rpc->calls,
                         header->payload.header->correlation_id)) == NULL) {
             CTRACE("no pending call for correlation_id %s, ignoring",
-                  (char *)header->payload.header->correlation_id->data);
+                  (char *)BDATA(header->payload.header->correlation_id));
             if (data != NULL) {
                 free(data);
             }
@@ -284,9 +284,9 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
         assert(rpc->reply_to != NULL);
         if (*rpc->exchange != '\0') {
             if (amqp_channel_bind_queue(chan,
-                                        (char *)rpc->reply_to->data,
+                                        (char *)BDATA(rpc->reply_to),
                                         rpc->exchange,
-                                        (char *)rpc->reply_to->data,
+                                        (char *)BDATA(rpc->reply_to),
                                         0) != 0) {
                 res = AMQP_RPC_SETUP_CLIENT + 2;
                 goto err;
@@ -294,7 +294,7 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
         }
     }
     if ((rpc->cons = amqp_channel_create_consumer(chan,
-                                                  (char *)rpc->reply_to->data,
+                                                  (char *)BDATA(rpc->reply_to),
                                                   NULL,
                                                   CONSUME_FNOACK)) == NULL) {
         res = AMQP_RPC_SETUP_CLIENT + 3;

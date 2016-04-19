@@ -44,7 +44,7 @@ NEWDECL(mname)                                                 \
             (void)bytestream_nprintf(bs,               \
                                      1024,             \
                                      #n "='%s' ",      \
-                                     m->n->data);      \
+                                     BDATA(m->n));     \
         } else {                                       \
             (void)bytestream_nprintf(bs,               \
                                      1024,             \

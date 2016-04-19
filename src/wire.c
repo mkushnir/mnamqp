@@ -263,7 +263,7 @@ pack_shortstr(bytestream_t *bs, bytes_t *s)
      */
     u.sz = (uint8_t)s->sz - 1;
     (void)bytestream_cat(bs, sizeof(uint8_t), &u.c);
-    (void)bytestream_cat(bs, u.sz, (char *)s->data);
+    (void)bytestream_cat(bs, u.sz, (char *)BDATA(s));
 }
 
 
@@ -287,8 +287,8 @@ unpack_shortstr(bytestream_t *bs, int fd, bytes_t **v)
         }
     }
 
-    memcpy((*v)->data, SPDATA(bs), sz);
-    (*v)->data[sz] = '\0';
+    memcpy(BDATA(*v), SPDATA(bs), sz);
+    BDATA(*v)[sz] = '\0';
     SADVANCEPOS(bs, sz);
     BYTES_INCREF(*v);
     return sizeof(uint8_t) + sz;
@@ -311,7 +311,7 @@ pack_longstr(bytestream_t *bs, bytes_t *s)
      * discard terminating zero, not to be counted in AMQP
      */
     (void)bytestream_cat(bs, sizeof(uint32_t), &u.c);
-    (void)bytestream_cat(bs, s->sz - 1, (char *)s->data);
+    (void)bytestream_cat(bs, s->sz - 1, (char *)BDATA(s));
 }
 
 
@@ -335,8 +335,8 @@ unpack_longstr(bytestream_t *bs, int fd, bytes_t **v)
         }
     }
 
-    memcpy((*v)->data, SPDATA(bs), sz);
-    (*v)->data[sz] = '\0';
+    memcpy(BDATA(*v), SPDATA(bs), sz);
+    BDATA(*v)[sz] = '\0';
     SADVANCEPOS(bs, sz);
     BYTES_INCREF(*v);
     return sizeof(uint32_t) + sz;
@@ -524,7 +524,7 @@ table_get_value(hash_t *v, bytes_t *key)
 static int
 table_str_cb(bytes_t *key, amqp_value_t *val, bytestream_t *bs)
 {
-    bytestream_nprintf(bs, 1024, "%s=", key->data);
+    bytestream_nprintf(bs, 1024, "%s=", BDATA(key));
     switch (val->ty->tag) {
     case AMQP_TBOOL:
         (void)bytestream_nprintf(bs, 1024, "%s ", val->value.b ? "#t" : "#f");
@@ -576,7 +576,7 @@ table_str_cb(bytes_t *key, amqp_value_t *val, bytestream_t *bs)
             (void)bytestream_nprintf(bs,
                                1024,
                                "'%s' ",
-                               val->value.str->data);
+                               BDATA(val->value.str));
         } else {
             (void)bytestream_nprintf(bs,
                                1024,

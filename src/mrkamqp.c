@@ -261,7 +261,7 @@ amqp_pending_content_destroy(amqp_pending_content_t **pc)
         while ((fr = STQUEUE_HEAD(&(*pc)->body)) != NULL) {
             STQUEUE_DEQUEUE(&(*pc)->body, link);
             STQUEUE_ENTRY_FINI(link, fr);
-            amqp_frame_destroy(&fr);
+            amqp_frame_destroy_body(&fr);
         }
         free(*pc);
         *pc = NULL;
@@ -562,7 +562,7 @@ next_frame(amqp_conn_t *conn)
                 if (pc == NULL) {
                     CTRACE("got body, not found pending content, "
                            "discarding frame");
-                    amqp_frame_destroy_header(&fr);
+                    amqp_frame_destroy_body(&fr);
                 } else {
                     if (pc->method == NULL || pc->header == NULL) {
                         /*
@@ -834,10 +834,10 @@ amqp_conn_run(amqp_conn_t *conn)
     sz0 = strlen(conn->user);
     sz1 = strlen(conn->password);
     start_ok->response = bytes_new(3 + sz0 + sz1);
-    start_ok->response->data[0] = '\0';
-    memcpy(&start_ok->response->data[1], conn->user, sz0);
-    start_ok->response->data[1 + sz0] = '\0';
-    memcpy(&start_ok->response->data[2 + sz0], conn->password, sz1);
+    BDATA(start_ok->response)[0] = '\0';
+    memcpy(&BDATA(start_ok->response)[1], conn->user, sz0);
+    BDATA(start_ok->response)[1 + sz0] = '\0';
+    memcpy(&BDATA(start_ok->response)[2 + sz0], conn->password, sz1);
     start_ok->locale = bytes_new_from_str("en_US");
     fr1->payload.params = (amqp_meth_params_t *)start_ok;
     channel_send_frame(conn->chan0, fr1);
@@ -1138,7 +1138,7 @@ channel_expect_method(amqp_channel_t *chan,
             }
 
         } else {
-            CTRACE("frame support not implemented");
+            CTRACE("non-method frame is not expected in the method context");
             amqp_frame_destroy(fr);
             res = CHANNEL_EXPECT_METHOD + 3;
             goto err;
@@ -1814,6 +1814,28 @@ err:
 }
 
 
+void
+amqp_channel_drain_methods(amqp_channel_t *chan)
+{
+    amqp_frame_t *fr;
+
+    while ((fr = STQUEUE_HEAD(&chan->iframes)) != NULL) {
+        STQUEUE_DEQUEUE(&chan->iframes, link);
+        STQUEUE_ENTRY_FINI(link, fr);
+
+        assert(fr->chan == chan->id);
+
+        if (fr->type == AMQP_FMETHOD) {
+            CTRACE("draining:");
+        } else {
+            CTRACE("non-method frame is not expected in the method context:");
+        }
+        amqp_frame_dump(fr);
+        TRACEC("\n");
+        amqp_frame_destroy(&fr);
+    }
+}
+
 /*
  * consumer
  */
@@ -1966,7 +1988,7 @@ content_thread_worker(UNUSED int argc, void **argv)
 
     mrkthr_signal_init(&cons->content_sig, mrkthr_me());
 
-    //CTRACE("consumer %s listening ...", cons->consumer_tag->data);
+    //CTRACE("consumer %s listening ...", BDATA(cons->consumer_tag));
     while (!cons->closed) {
         amqp_pending_content_t *pc;
         char *data;

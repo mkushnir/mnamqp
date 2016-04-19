@@ -281,6 +281,8 @@ int amqp_channel_publish_ex(amqp_channel_t *,
 
 #define ACK_MULTIPLE                    0x01
 
+void amqp_channel_drain_methods(amqp_channel_t *);
+
 /*
  * consumer
  */
