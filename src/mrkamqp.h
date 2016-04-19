@@ -371,8 +371,7 @@ int amqp_rpc_call(amqp_rpc_t *,
                   size_t,
                   amqp_rpc_request_header_cb_t,
                   amqp_consumer_content_cb_t,
-                  void *,
-                  uint64_t);
+                  void *);
 
 /*
  * module

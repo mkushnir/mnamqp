@@ -173,8 +173,7 @@ run_conn(void)
                                 request->sz,
                                 NULL,
                                 respcb,
-                                NULL,
-                                2000);
+                                NULL);
             BYTES_DECREF(&request);
             if (res != 0) {
                 if (res != MRKTHR_WAIT_TIMEOUT) {

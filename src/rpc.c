@@ -340,8 +340,7 @@ amqp_rpc_call(amqp_rpc_t *rpc,
               size_t sz,
               amqp_rpc_request_header_cb_t request_header_cb,
               amqp_consumer_content_cb_t response_cb,
-              void *header_udata,
-              uint64_t timeout)
+              void *header_udata)
 {
     int res;
     struct {
@@ -379,10 +378,8 @@ amqp_rpc_call(amqp_rpc_t *rpc,
         goto err;
     }
 
-    if ((res = mrkthr_signal_subscribe_with_timeout(&cc.sig, timeout)) != 0) {
-        if (res != MRKTHR_WAIT_TIMEOUT) {
-            res = AMQP_RPC_CALL + 2;
-        }
+    if (mrkthr_signal_subscribe(&cc.sig) != 0) {
+        res = AMQP_RPC_CALL + 2;
         goto err;
     }
 
