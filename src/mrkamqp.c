@@ -789,9 +789,9 @@ amqp_conn_run(amqp_conn_t *conn)
 
     conn->chan0 = amqp_channel_new(conn);
     assert(conn->chan0->id == 0);
-    conn->recv_thread = mrkthr_spawn("recvthr", recv_thread_worker, 1, conn);
+    conn->recv_thread = mrkthr_spawn("amqrcv", recv_thread_worker, 1, conn);
     mrkthr_set_prio(conn->recv_thread, 1);
-    conn->send_thread = mrkthr_spawn("sendthr", send_thread_worker, 1, conn);
+    conn->send_thread = mrkthr_spawn("amqsnd", send_thread_worker, 1, conn);
     mrkthr_set_prio(conn->send_thread, 1);
 
     // >>> AMQP0091
