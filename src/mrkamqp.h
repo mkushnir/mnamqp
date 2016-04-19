@@ -359,13 +359,13 @@ AMQP_HEADER_SET_DECL(cluster_id, bytes_t *);
  */
 amqp_rpc_t *amqp_rpc_new(char *, char *, char *);
 void amqp_rpc_destroy(amqp_rpc_t **);
-int amqp_rpc_setup_client(amqp_rpc_t *, amqp_channel_t *);
-int amqp_rpc_setup_server(amqp_rpc_t *,
-                          amqp_channel_t *,
-                          amqp_rpc_server_handler_t,
-                          void *);
+MRKAMQP_SYNC int amqp_rpc_setup_client(amqp_rpc_t *, amqp_channel_t *);
+MRKAMQP_SYNC int amqp_rpc_setup_server(amqp_rpc_t *,
+                                       amqp_channel_t *,
+                                       amqp_rpc_server_handler_t,
+                                       void *);
 int amqp_rpc_run(amqp_rpc_t *);
-int amqp_rpc_teardown(amqp_rpc_t *);
+MRKAMQP_SYNC int amqp_rpc_teardown(amqp_rpc_t *);
 int amqp_rpc_call(amqp_rpc_t *,
                   const char *,
                   size_t,
