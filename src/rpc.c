@@ -422,7 +422,7 @@ amqp_rpc_teardown(amqp_rpc_t *rpc)
         }
         rpc->cons = NULL;
     }
-    if (rpc->chan != NULL) {
+    if (rpc->chan != NULL && rpc->reply_to != NULL) {
         if ((res = amqp_channel_delete_queue(rpc->chan,
                                              (char *)BDATA(rpc->reply_to),
                                              0)) != 0) {
