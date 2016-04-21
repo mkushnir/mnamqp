@@ -1145,6 +1145,11 @@ channel_expect_method(amqp_channel_t *chan,
         STQUEUE_DEQUEUE(&chan->iframes, link);
         STQUEUE_ENTRY_FINI(link, *fr);
 
+        if ((*fr)->chan != chan->id) {
+            TRACEC(FRED("<<< "));
+            amqp_frame_dump(*fr);
+            TRACEC("\n");
+        }
         assert((*fr)->chan == chan->id);
 
         if ((*fr)->type == AMQP_FMETHOD) {
@@ -1827,10 +1832,10 @@ amqp_close_channel(amqp_channel_t *chan)
         goto err;
     }
 
-    chan->closed = 1;
     mrkthr_sema_release(&chan->sync_sema);
 
 end:
+    chan->closed = 1;
     amqp_frame_destroy_method(&fr0);
     return res;
 
@@ -2167,6 +2172,7 @@ int
 amqp_close_consumer(amqp_consumer_t *cons)
 {
     if (!cons->closed) {
+        cons->closed = 1;
         assert(cons->consumer_tag != NULL);
         if (amqp_channel_cancel(cons->chan,
                                 (const char *)BDATA(cons->consumer_tag),
@@ -2174,7 +2180,6 @@ amqp_close_consumer(amqp_consumer_t *cons)
             TR(AMQP_CLOSE_CONSUMER + 1);
         }
         BYTES_DECREF(&cons->consumer_tag);
-        cons->closed = 1;
     }
     return 0;
 }
