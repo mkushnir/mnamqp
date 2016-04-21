@@ -84,12 +84,12 @@ void
 amqp_rpc_destroy(amqp_rpc_t **rpc)
 {
     if ((*rpc) != NULL) {
+        (void)amqp_rpc_teardown(*rpc);
         hash_fini(&(*rpc)->calls);
         free((*rpc)->exchange);
         free((*rpc)->routing_key);
         BYTES_DECREF(&(*rpc)->reply_to);
         (*rpc)->chan = NULL;
-        (void)amqp_rpc_teardown(*rpc);
         free(*rpc);
         *rpc = NULL;
     }
@@ -274,7 +274,8 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
     if (rpc->reply_to == NULL) {
         if (amqp_channel_declare_queue_ex(chan,
                                           "",
-                                          DECLARE_QUEUE_FEXCLUSIVE,
+                                          DECLARE_QUEUE_FEXCLUSIVE |
+                                            DECLARE_EXCHANGE_FAUTODELETE,
                                           NULL,
                                           amqp_rpc_setup_client_cb0,
                                           rpc) != 0) {
@@ -407,6 +408,13 @@ amqp_rpc_teardown(amqp_rpc_t *rpc)
             TR(res);
         }
         rpc->cons = NULL;
+    }
+    if (rpc->chan != NULL) {
+        if ((res = amqp_channel_delete_queue(rpc->chan,
+                                             (char *)BDATA(rpc->reply_to),
+                                             0)) != 0) {
+            TR(res);
+        }
     }
     return res;
 }
