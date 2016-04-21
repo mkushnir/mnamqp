@@ -102,6 +102,7 @@ amqp_conn_new(const char *host,
     array_init(&conn->channels, sizeof(amqp_channel_t *), 0,
                NULL,
                (array_finalizer_t)amqp_channel_destroy);
+    conn->chan0 = NULL;
     conn->error_code = 0;
     conn->error_msg = NULL;
     conn->closed = 1;
@@ -131,6 +132,9 @@ amqp_conn_open(amqp_conn_t *conn)
 
     ainfos = NULL;
     if (getaddrinfo(conn->host, portstr, &hints, &ainfos) != 0) {
+        if (ainfos != NULL) {
+            freeaddrinfo(ainfos);
+        }
         TRRET(AMQP_CONN_OPEN + 3);
     }
 
