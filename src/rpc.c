@@ -75,6 +75,7 @@ amqp_rpc_new(char *exchange,
               (hash_item_finalizer_t)rpc_call_item_fini);
     rpc->next_id = 0ll;
     rpc->cccb = NULL;
+    rpc->clcb = NULL;
 
     return rpc;
 }
@@ -95,6 +96,16 @@ amqp_rpc_destroy(amqp_rpc_t **rpc)
     }
 }
 
+
+static int
+amqp_rpc_cancel_cb(UNUSED amqp_frame_t *method,
+                   UNUSED amqp_frame_t *header,
+                   UNUSED char *data,
+                   UNUSED void *udata)
+{
+    CTRACE("rpc was cancelled");
+    return 0;
+}
 
 /*
  * server
@@ -191,6 +202,7 @@ amqp_rpc_setup_server(amqp_rpc_t *rpc,
         goto err;
     }
     rpc->cccb = amqp_rpc_server_cb;
+    rpc->clcb = amqp_rpc_cancel_cb;
     rpc->server_handler = server_handler;
     rpc->server_udata = server_udata;
 
@@ -302,6 +314,7 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
         goto err;
     }
     rpc->cccb = amqp_rpc_client_cb;
+    rpc->clcb = amqp_rpc_cancel_cb;
 
 end:
     return res;
@@ -427,7 +440,10 @@ amqp_rpc_run_spawn_worker(UNUSED int argc, void **argv)
 
     assert(argc == 1);
     rpc = argv[0];
-    return amqp_consumer_handle_content(rpc->cons, rpc->cccb, rpc);
+    return amqp_consumer_handle_content(rpc->cons,
+                                        rpc->cccb,
+                                        rpc->clcb,
+                                        rpc);
 }
 
 
@@ -436,6 +452,7 @@ amqp_rpc_run_spawn(amqp_rpc_t *rpc)
 {
     assert(rpc->cons != NULL);
     assert(rpc->cccb != NULL);
+    assert(rpc->clcb != NULL);
     return mrkthr_spawn("amqrpc", amqp_rpc_run_spawn_worker, 1, rpc);
 }
 
@@ -444,7 +461,11 @@ amqp_rpc_run(amqp_rpc_t *rpc)
 {
     assert(rpc->cons != NULL);
     assert(rpc->cccb != NULL);
-    return amqp_consumer_handle_content(rpc->cons, rpc->cccb, rpc);
+    assert(rpc->clcb != NULL);
+    return amqp_consumer_handle_content(rpc->cons,
+                                        rpc->cccb,
+                                        rpc->clcb,
+                                        rpc);
 }
 
 

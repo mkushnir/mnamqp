@@ -729,6 +729,7 @@ NEWDECL(queue_delete);
 NEWDECL(basic_qos);
 NEWDECL(basic_consume);
 NEWDECL(basic_cancel);
+NEWDECL(basic_cancel_ok);
 NEWDECL(basic_publish);
 NEWDECL(basic_deliver);
 NEWDECL(basic_ack);

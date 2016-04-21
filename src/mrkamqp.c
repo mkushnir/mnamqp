@@ -396,6 +396,32 @@ next_frame(amqp_conn_t *conn)
                             &(*chan)->content_consumer->content_sig);
                 }
 
+            } else if (fr->payload.params->mi->mid == AMQP_BASIC_CANCEL) {
+                amqp_basic_cancel_t *m;
+                hash_item_t *dit;
+
+                m = (amqp_basic_cancel_t *)fr->payload.params;
+                if ((dit = hash_get_item(&(*chan)->consumers,
+                                         m->consumer_tag)) == NULL) {
+                    CTRACE("got basic.cancel to %s, "
+                           "cannot find, discarding frame",
+                           BDATA(m->consumer_tag));
+                    amqp_frame_destroy_method(&fr);
+
+                } else {
+                    amqp_pending_content_t *pc;
+
+                    (*chan)->content_consumer = dit->value;
+                    pc = amqp_pending_content_new();
+                    pc->method = fr;
+                    STQUEUE_ENQUEUE(
+                            &(*chan)->content_consumer->pending_content,
+                            link,
+                            pc);
+                    mrkthr_signal_send(
+                            &(*chan)->content_consumer->content_sig);
+                }
+
             } else if (fr->payload.params->mi->mid == AMQP_BASIC_ACK) {
                 amqp_basic_ack_t *m;
                 amqp_pending_pub_t *pp;
@@ -1854,6 +1880,7 @@ amqp_consumer_new(amqp_channel_t *chan, uint8_t flags)
     mrkthr_signal_init(&cons->content_sig, NULL);
     cons->content_thread = NULL;
     cons->content_cb = NULL;
+    cons->cancel_cb = NULL;
     cons->content_udata = NULL;
     cons->flags = flags;
     cons->closed = 0;
@@ -2002,74 +2029,103 @@ content_thread_worker(UNUSED int argc, void **argv)
         }
 
         assert(pc->method != NULL);
-        assert(pc->method->payload.params->mi->mid == AMQP_BASIC_DELIVER);
-        /*
-         * XXX content_cb ?
-         */
+        if (pc->method->payload.params->mi->mid == AMQP_BASIC_DELIVER) {
+            /*
+             * XXX content_cb ?
+             */
 
-        if (pc->header == NULL) {
-            if (mrkthr_signal_subscribe(&cons->content_sig) != 0) {
-                res = CONTENT_THREAD_WORKER + 2;
-                goto err;
-            }
-            continue;
-        }
-        /*
-         * XXX content_cb ?
-         */
-
-        if ((data = malloc(pc->header->payload.header->body_size)) == NULL) {
-            FAIL("malloc");
-        }
-
-        while (pc->header->payload.header->body_size >
-               pc->header->payload.header->_received_size) {
-            size_t sz0;
-            amqp_frame_t *fr;
-
-            if ((fr = STQUEUE_HEAD(&pc->body)) == NULL) {
+            if (pc->header == NULL) {
                 if (mrkthr_signal_subscribe(&cons->content_sig) != 0) {
-                    res = CONTENT_THREAD_WORKER + 3;
+                    res = CONTENT_THREAD_WORKER + 2;
                     goto err;
                 }
                 continue;
             }
-            sz0 = pc->header->payload.header->_received_size;
-            memcpy(data + sz0, fr->payload.body, fr->sz);
-            pc->header->payload.header->_received_size += fr->sz;
-            STQUEUE_DEQUEUE(&pc->body, link);
-            STQUEUE_ENTRY_FINI(link, fr);
-            amqp_frame_destroy(&fr);
             /*
              * XXX content_cb ?
              */
+
+            if ((data = malloc(pc->header->payload.header->body_size)) == NULL) {
+                FAIL("malloc");
+            }
+
+            while (pc->header->payload.header->body_size >
+                   pc->header->payload.header->_received_size) {
+                size_t sz0;
+                amqp_frame_t *fr;
+
+                if ((fr = STQUEUE_HEAD(&pc->body)) == NULL) {
+                    if (mrkthr_signal_subscribe(&cons->content_sig) != 0) {
+                        res = CONTENT_THREAD_WORKER + 3;
+                        goto err;
+                    }
+                    continue;
+                }
+                sz0 = pc->header->payload.header->_received_size;
+                memcpy(data + sz0, fr->payload.body, fr->sz);
+                pc->header->payload.header->_received_size += fr->sz;
+                STQUEUE_DEQUEUE(&pc->body, link);
+                STQUEUE_ENTRY_FINI(link, fr);
+                amqp_frame_destroy(&fr);
+                /*
+                 * XXX content_cb ?
+                 */
+            }
+
+            assert(cons->content_cb != NULL);
+            res = cons->content_cb(pc->method,
+                                   pc->header,
+                                   data,
+                                   cons->content_udata);
+            data = NULL; /* passed over to content_cb() */
+
+            if (!(cons->flags & CONSUME_FNOACK)) {
+                amqp_frame_t *fr1;
+                amqp_basic_ack_t *m;
+                amqp_basic_deliver_t *d;
+
+                fr1 = amqp_frame_new(cons->chan->id, AMQP_FMETHOD);
+                m = NEWREF(basic_ack)();
+                d = (amqp_basic_deliver_t *)pc->method->payload.params;
+                m->delivery_tag = d->delivery_tag;
+                fr1->payload.params = (amqp_meth_params_t *)m;
+                channel_send_frame(cons->chan, fr1);
+                fr1 = NULL;
+            }
+
+            STQUEUE_DEQUEUE(&cons->pending_content, link);
+            STQUEUE_ENTRY_FINI(link, pc);
+            amqp_pending_content_destroy(&pc);
+
+            if (res != 0) {
+                break;
+            }
+
+        } else if (pc->method->payload.params->mi->mid == AMQP_BASIC_CANCEL) {
+            if (cons->cancel_cb != NULL) {
+                res = cons->cancel_cb(pc->method,
+                                      pc->header,
+                                      NULL,
+                                      cons->content_udata);
+            }
+
+            STQUEUE_DEQUEUE(&cons->pending_content, link);
+            STQUEUE_ENTRY_FINI(link, pc);
+            amqp_pending_content_destroy(&pc);
+
+            BYTES_DECREF(&cons->consumer_tag);
+            cons->closed = 1;
+
+            if (res != 0) {
+                break;
+            }
+
+        } else {
         }
-
-        assert(cons->content_cb != NULL);
-        res = cons->content_cb(pc->method, pc->header, data, cons->content_udata);
-        data = NULL; /* passed over to content_cb() */
-
-        if (!(cons->flags & CONSUME_FNOACK)) {
-            amqp_frame_t *fr1;
-            amqp_basic_ack_t *m;
-            amqp_basic_deliver_t *d;
-
-            fr1 = amqp_frame_new(cons->chan->id, AMQP_FMETHOD);
-            m = NEWREF(basic_ack)();
-            d = (amqp_basic_deliver_t *)pc->method->payload.params;
-            m->delivery_tag = d->delivery_tag;
-            fr1->payload.params = (amqp_meth_params_t *)m;
-            channel_send_frame(cons->chan, fr1);
-            fr1 = NULL;
-        }
-
-        STQUEUE_DEQUEUE(&cons->pending_content, link);
-        STQUEUE_ENTRY_FINI(link, pc);
-        amqp_pending_content_destroy(&pc);
     }
 
 end:
-    return res;
+    MRKTHRET(res);
 err:
     TR(res);
     goto end;
@@ -2079,10 +2135,12 @@ err:
 
 int
 amqp_consumer_handle_content_spawn(amqp_consumer_t *cons,
-                                   amqp_consumer_content_cb_t cb,
+                                   amqp_consumer_content_cb_t ctcb,
+                                   amqp_consumer_content_cb_t clcb,
                                    void *udata)
 {
-    cons->content_cb = cb;
+    cons->content_cb = ctcb;
+    cons->cancel_cb = clcb;
     cons->content_udata = udata;
     cons->content_thread = mrkthr_spawn((char *)BDATA(cons->consumer_tag),
                                         content_thread_worker,
@@ -2095,10 +2153,12 @@ amqp_consumer_handle_content_spawn(amqp_consumer_t *cons,
 
 int
 amqp_consumer_handle_content(amqp_consumer_t *cons,
-                             amqp_consumer_content_cb_t cb,
+                             amqp_consumer_content_cb_t ctcb,
+                             amqp_consumer_content_cb_t clcb,
                              void *udata)
 {
-    cons->content_cb = cb;
+    cons->content_cb = ctcb;
+    cons->cancel_cb = clcb;
     cons->content_udata = udata;
     return content_thread_worker(1, (void **)(&cons));
 }

@@ -310,7 +310,7 @@ run_conn(int argc, char **argv)
 
     mrkthr_spawn("pub", mypub, 3, chan, argc, argv);
 
-    (void)amqp_consumer_handle_content(cons, my_content_cb, NULL);
+    (void)amqp_consumer_handle_content(cons, my_content_cb, NULL, NULL);
 
     if (amqp_close_consumer(cons) != 0) {
         res = 1;

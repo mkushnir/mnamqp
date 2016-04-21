@@ -183,7 +183,7 @@ run(UNUSED int argc, UNUSED void **argv)
 
     mrkthr_spawn("pub", mypub, 1, chan);
 
-    amqp_consumer_handle_content(cons, my_content_cb, NULL);
+    amqp_consumer_handle_content(cons, my_content_cb, NULL, NULL);
 
     if (amqp_close_consumer(cons)) {
     }

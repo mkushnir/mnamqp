@@ -93,6 +93,7 @@ typedef struct _amqp_consumer {
     mrkthr_signal_t content_sig;
     mrkthr_ctx_t *content_thread;
     amqp_consumer_content_cb_t content_cb;
+    amqp_consumer_content_cb_t cancel_cb;
     void *content_udata;
     uint8_t flags;
     int closed:1;
@@ -162,6 +163,7 @@ typedef struct _amqp_rpc {
     hash_t calls;
     uint64_t next_id;
     amqp_consumer_content_cb_t cccb;
+    amqp_consumer_content_cb_t clcb;
     amqp_rpc_server_handler_t server_handler;
     void *server_udata;
 } amqp_rpc_t;
@@ -296,8 +298,10 @@ MRKAMQP_SYNC amqp_consumer_t *amqp_channel_create_consumer(amqp_channel_t *,
                                                            uint8_t);
 int amqp_consumer_handle_content_spawn(amqp_consumer_t *,
                                        amqp_consumer_content_cb_t,
+                                       amqp_consumer_content_cb_t,
                                        void *);
 int amqp_consumer_handle_content(amqp_consumer_t *,
+                                 amqp_consumer_content_cb_t,
                                  amqp_consumer_content_cb_t,
                                  void *);
 void amqp_consumer_reset_content_state(amqp_consumer_t *);
