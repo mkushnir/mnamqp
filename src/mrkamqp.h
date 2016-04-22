@@ -60,7 +60,7 @@ typedef struct _amqp_channel {
     amqp_conn_t *conn;
     /* incoming frames */
     STQUEUE(_amqp_frame, iframes);
-    mrkthr_signal_t iframe_sig;
+    mrkthr_signal_t expect_sig;
     mrkthr_sema_t sync_sema;
     hash_t consumers;
     /* weak ref */
@@ -187,6 +187,7 @@ int amqp_conn_open(amqp_conn_t *);
 int amqp_conn_run(amqp_conn_t *);
 mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
 MRKAMQP_SYNC int amqp_conn_close(amqp_conn_t *);
+void amqp_conn_close_dirty(amqp_conn_t *);
 
 
 /*
