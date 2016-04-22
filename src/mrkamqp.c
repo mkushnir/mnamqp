@@ -42,7 +42,6 @@ MEMDEBUG_DECLARE(mrkamqp);
 #endif
 #endif
 
-static void amqp_conn_stop_threads(amqp_conn_t *);
 static amqp_channel_t *amqp_channel_new(amqp_conn_t *);
 static int amqp_channel_destroy(amqp_channel_t **);
 static int channel_expect_method(amqp_channel_t *,
@@ -84,9 +83,9 @@ amqp_conn_new(const char *host,
         FAIL("strdup");
     }
     conn->channel_max = channel_max;
-    conn->heartbeat = heartbeat;
     conn->frame_max = frame_max;
     conn->payload_max = frame_max = 8;
+    conn->heartbeat = heartbeat;
     conn->capabilities = capabilities;
 
     conn->fd = -1;
@@ -113,6 +112,7 @@ amqp_conn_new(const char *host,
 int
 amqp_conn_open(amqp_conn_t *conn)
 {
+    int res;
     struct addrinfo hints, *ainfos, *ai;
     char portstr[32];
 
@@ -138,6 +138,7 @@ amqp_conn_open(amqp_conn_t *conn)
         TRRET(AMQP_CONN_OPEN + 3);
     }
 
+    res = 0;
     for (ai = ainfos; ai != NULL; ai = ai->ai_next) {
         UNUSED int optval;
         UNUSED socklen_t optlen;
@@ -185,55 +186,28 @@ amqp_conn_open(amqp_conn_t *conn)
         //}
 
         if (mrkthr_connect(conn->fd, ai->ai_addr, ai->ai_addrlen) != 0) {
-            TRRET(AMQP_CONN_OPEN + 4);
+            res = AMQP_CONN_OPEN + 4;
+            goto err;
         }
 
         break;
     }
 
-    freeaddrinfo(ainfos);
-
     if (conn->fd < 0) {
-        TRRET(AMQP_CONN_OPEN + 5);
+        res = AMQP_CONN_OPEN + 5;
+        goto err;
     }
 
     conn->closed = 0;
-    return 0;
-}
 
+end:
+    freeaddrinfo(ainfos);
 
-static void
-amqp_conn_close_fd(amqp_conn_t *conn)
-{
-    if (conn->fd != -1) {
-        close(conn->fd);
-        conn->fd = -1;
-    }
-    conn->closed = 1;
-}
+    return res;
 
-
-static void
-receive_octets(amqp_conn_t *conn, amqp_frame_t *fr)
-{
-    ssize_t nread, need;
-
-    nread = 0;
-    assert(fr->payload.body == NULL);
-    if ((fr->payload.body = malloc(fr->sz)) == NULL) {
-        FAIL("malloc");
-    }
-    while (nread < fr->sz) {
-        if (SNEEDMORE(&conn->ins)) {
-            if (bytestream_consume_data(&conn->ins, conn->fd) != 0) {
-                break;
-            }
-        }
-        need = MIN(fr->sz - nread, SEOD(&conn->ins) - SPOS(&conn->ins));
-        memcpy(fr->payload.body + nread, SPDATA(&conn->ins), need);
-        SADVANCEPOS(&conn->ins, need);
-        nread += need;
-    }
+err:
+    TR(res);
+    goto end;
 }
 
 
@@ -273,11 +247,27 @@ amqp_pending_content_destroy(amqp_pending_content_t **pc)
 }
 
 
-void
-amqp_conn_close_hard(amqp_conn_t *conn)
+static void
+receive_octets(amqp_conn_t *conn, amqp_frame_t *fr)
 {
-    amqp_conn_stop_threads(conn);
-    amqp_conn_close_fd(conn);
+    ssize_t nread, need;
+
+    nread = 0;
+    assert(fr->payload.body == NULL);
+    if ((fr->payload.body = malloc(fr->sz)) == NULL) {
+        FAIL("malloc");
+    }
+    while (nread < fr->sz) {
+        if (SNEEDMORE(&conn->ins)) {
+            if (bytestream_consume_data(&conn->ins, conn->fd) != 0) {
+                break;
+            }
+        }
+        need = MIN(fr->sz - nread, SEOD(&conn->ins) - SPOS(&conn->ins));
+        memcpy(fr->payload.body + nread, SPDATA(&conn->ins), need);
+        SADVANCEPOS(&conn->ins, need);
+        nread += need;
+    }
 }
 
 
@@ -652,6 +642,30 @@ err:
 }
 
 
+static int
+recv_thread_worker(UNUSED int argc, void **argv)
+{
+    amqp_conn_t *conn;
+
+    assert(argc == 1);
+    conn = argv[0];
+
+    while (!conn->closed) {
+        if (next_frame(conn) != 0) {
+            break;
+        }
+
+        /* will no longer read this time */
+        if (SNEEDMORE(&conn->ins)) {
+            bytestream_rewind(&conn->ins);
+        }
+    }
+
+    //TRACE("Exiting recv_tread ...");
+    return 0;
+}
+
+
 static void
 pack_frame(amqp_conn_t *conn, amqp_frame_t *fr)
 {
@@ -723,31 +737,6 @@ pack_frame(amqp_conn_t *conn, amqp_frame_t *fr)
 
 
 static int
-recv_thread_worker(UNUSED int argc, void **argv)
-{
-    amqp_conn_t *conn;
-
-    assert(argc == 1);
-    conn = argv[0];
-
-    while (!conn->closed) {
-        if (next_frame(conn) != 0) {
-            break;
-        }
-
-        /* will no longer read this time */
-        if (SNEEDMORE(&conn->ins)) {
-            bytestream_rewind(&conn->ins);
-        }
-        conn->since_last_frame = mrkthr_get_now();
-    }
-
-    //TRACE("Exiting recv_tread ...");
-    return 0;
-}
-
-
-static int
 send_thread_worker(UNUSED int argc, void **argv)
 {
     amqp_conn_t *conn;
@@ -781,16 +770,17 @@ send_thread_worker(UNUSED int argc, void **argv)
             }
         }
     }
+    mrkthr_signal_fini(&conn->oframe_sig);
     return 0;
 }
 
 
-static void
+static int
 send_raw_octets(amqp_conn_t *conn, uint8_t *octets, size_t sz)
 {
     bytestream_rewind(&conn->outs);
     (void)bytestream_cat(&conn->outs, sz, (char *)octets);
-    (void)bytestream_produce_data(&conn->outs, conn->fd);
+    return bytestream_produce_data(&conn->outs, conn->fd);
 }
 
 
@@ -825,11 +815,14 @@ amqp_conn_run(amqp_conn_t *conn)
     mrkthr_set_prio(conn->send_thread, 1);
 
     // >>> AMQP0091
-    send_raw_octets(conn, (uint8_t *)greeting, sizeof(greeting));
+    if (send_raw_octets(conn, (uint8_t *)greeting, sizeof(greeting)) != 0) {
+        res = AMQP_CONN_RUN + 1;
+        goto err;
+    }
 
     // <<< connection_start
     if (channel_expect_method(conn->chan0, AMQP_CONNECTION_START, &fr0) != 0) {
-        res = AMQP_CONN_RUN + 1;
+        res = AMQP_CONN_RUN + 2;
         goto err;
     }
     _start = (amqp_connection_start_t *)fr0->payload.params;
@@ -877,7 +870,7 @@ amqp_conn_run(amqp_conn_t *conn)
 
     // <<< connection_tune
     if (channel_expect_method(conn->chan0, AMQP_CONNECTION_TUNE, &fr0) != 0) {
-        res = AMQP_CONN_RUN + 2;
+        res = AMQP_CONN_RUN + 3;
         goto err;
     }
     tune = (amqp_connection_tune_t *)fr0->payload.params;
@@ -902,7 +895,7 @@ amqp_conn_run(amqp_conn_t *conn)
     fr1 = NULL;
 
     if (conn->frame_max <= 0) {
-        res = AMQP_CONN_RUN + 3;
+        res = AMQP_CONN_RUN + 4;
         goto err;
     }
 
@@ -920,7 +913,7 @@ amqp_conn_run(amqp_conn_t *conn)
     if (channel_expect_method(conn->chan0,
                               AMQP_CONNECTION_OPEN_OK,
                               &fr0) != 0) {
-        res = AMQP_CONN_RUN + 4;
+        res = AMQP_CONN_RUN + 5;
         goto err;
     }
 
@@ -931,6 +924,68 @@ end:
 err:
     TR(res);
     goto end;
+}
+
+
+static void
+amqp_conn_close_fd(amqp_conn_t *conn)
+{
+    if (conn->fd != -1) {
+        close(conn->fd);
+        conn->fd = -1;
+    }
+    conn->closed = 1;
+}
+
+
+static int
+consumer_stop_threads_cb(UNUSED bytes_t *key,
+                         amqp_consumer_t *cons,
+                         UNUSED void *udata)
+{
+    cons->closed = 1;
+    if (mrkthr_signal_has_owner(&cons->content_sig)) {
+        mrkthr_signal_error(&cons->content_sig, MRKAMQP_STOP_THREADS);
+    }
+    if (cons->content_thread != NULL) {
+        (void)mrkthr_join(cons->content_thread);
+        cons->content_thread = NULL;
+    }
+    return 0;
+}
+
+
+static int
+channel_stop_threads_cb(amqp_channel_t **chan, UNUSED void *udata)
+{
+    (*chan)->closed = 1;
+
+    (void)hash_traverse(&(*chan)->consumers,
+                        (hash_traverser_t)consumer_stop_threads_cb, NULL);
+
+    if (mrkthr_signal_has_owner(&(*chan)->iframe_sig)) {
+        mrkthr_signal_error(&(*chan)->iframe_sig, MRKAMQP_STOP_THREADS);
+        (void)mrkthr_join((*chan)->iframe_sig.owner);
+    }
+    return 0;
+}
+
+
+static void
+amqp_conn_stop_threads(amqp_conn_t *conn)
+{
+    if (mrkthr_signal_has_owner(&conn->oframe_sig)) {
+        mrkthr_signal_error(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
+    }
+    if (conn->send_thread != NULL) {
+        (void)mrkthr_join(conn->send_thread);
+        conn->send_thread = NULL;
+    }
+    if (conn->recv_thread != NULL) {
+        (void)mrkthr_set_interrupt_and_join(conn->recv_thread);
+    }
+    (void)array_traverse(&conn->channels,
+                         (array_traverser_t)channel_stop_threads_cb, NULL);
 }
 
 
@@ -950,12 +1005,10 @@ amqp_conn_close(amqp_conn_t *conn)
     amqp_frame_t *fr0, *fr1;
     amqp_connection_close_t *clo;
 
+    assert(conn != NULL);
+
     res = 0;
     fr0 = NULL;
-
-    if (conn == NULL) {
-        return 0;
-    }
 
     if (conn->chan0 == NULL || conn->closed) {
         goto end1;
@@ -997,54 +1050,6 @@ end1:
 err:
     TR(res);
     goto end;
-}
-
-
-static int
-consumer_stop_threads_cb(UNUSED bytes_t *key,
-                         amqp_consumer_t *cons,
-                         UNUSED void *udata)
-{
-    cons->closed = 1;
-    if (mrkthr_signal_has_owner(&cons->content_sig)) {
-        mrkthr_signal_error(&cons->content_sig, MRKAMQP_STOP_THREADS);
-    }
-    if (cons->content_thread != NULL) {
-        (void)mrkthr_join(cons->content_thread);
-    }
-    return 0;
-}
-
-
-static int
-channel_stop_threads_cb(amqp_channel_t **chan, UNUSED void *udata)
-{
-    (*chan)->closed = 1;
-    if (mrkthr_signal_has_owner(&(*chan)->iframe_sig)) {
-        mrkthr_signal_error(&(*chan)->iframe_sig, MRKAMQP_STOP_THREADS);
-        (void)mrkthr_join((*chan)->iframe_sig.owner);
-    }
-    (void)hash_traverse(&(*chan)->consumers,
-                        (hash_traverser_t)consumer_stop_threads_cb, NULL);
-    return 0;
-}
-
-
-static void
-amqp_conn_stop_threads(amqp_conn_t *conn)
-{
-    if (mrkthr_signal_has_owner(&conn->oframe_sig)) {
-        mrkthr_signal_error(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
-        (void)mrkthr_join(conn->oframe_sig.owner);
-    }
-    //if (conn->send_thread != NULL) {
-    //    (void)mrkthr_set_interrupt_and_join(conn->send_thread);
-    //}
-    if (conn->recv_thread != NULL) {
-        (void)mrkthr_set_interrupt_and_join(conn->recv_thread);
-    }
-    (void)array_traverse(&conn->channels,
-                         (array_traverser_t)channel_stop_threads_cb, NULL);
 }
 
 
@@ -1203,9 +1208,11 @@ amqp_channel_destroy(amqp_channel_t **chan)
             STQUEUE_ENTRY_FINI(link, fr);
             amqp_frame_destroy(&fr);
         }
+        /* must have been finalized in channel_expect_method() */
         if (mrkthr_signal_has_owner(&(*chan)->iframe_sig)) {
-            mrkthr_signal_fini(&(*chan)->iframe_sig);
+            mrkthr_dump((*chan)->iframe_sig.owner);
         }
+        assert(!mrkthr_signal_has_owner(&(*chan)->iframe_sig));
         hash_fini(&(*chan)->consumers);
         mrkthr_sema_fini(&(*chan)->sync_sema);
         free(*chan);
@@ -1625,10 +1632,6 @@ amqp_channel_publish(amqp_channel_t *chan,
         TRRET(CHANNEL_PUBLISH + 1);
     }
 
-    //if (mrkthr_sema_acquire(&chan->sync_sema, 1) != 0) {
-    //    TRRET(CHANNEL_PUBLISH + 2);
-    //}
-
     STQUEUE_ENTRY_INIT(link, &pp);
     mrkthr_signal_init(&pp.sig, mrkthr_me());
     pp.publish_tag = ++chan->publish_tag;
@@ -1676,13 +1679,14 @@ amqp_channel_publish(amqp_channel_t *chan,
 
     if (chan->confirm_mode) {
         STQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
-        if (mrkthr_signal_subscribe(&pp.sig) != 0) {
-            res = CHANNEL_PUBLISH + 3;
+        if ((res = mrkthr_signal_subscribe(&pp.sig)) != 0) {
+            if (res != MRKAMQP_PROTOCOL_ERROR) {
+                res = CHANNEL_PUBLISH + 2;
+            }
         }
     }
 
     mrkthr_signal_fini(&pp.sig);
-    //mrkthr_sema_release(&chan->sync_sema);
     return res;
 }
 
@@ -1707,7 +1711,7 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     assert(exchange != NULL);
 
     if (chan->closed) {
-        TRRET(CHANNEL_PUBLISH + 1);
+        TRRET(CHANNEL_PUBLISH + 3);
     }
 
     STQUEUE_ENTRY_INIT(link, &pp);
@@ -1752,8 +1756,10 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
 
     if (chan->confirm_mode) {
         STQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
-        if (mrkthr_signal_subscribe(&pp.sig) != 0) {
-            res = CHANNEL_PUBLISH + 2;
+        if ((res = mrkthr_signal_subscribe(&pp.sig)) != 0) {
+            if (res != MRKAMQP_PROTOCOL_ERROR) {
+                res = CHANNEL_PUBLISH + 4;
+            }
         }
     }
 
@@ -1885,8 +1891,8 @@ amqp_consumer_new(amqp_channel_t *chan, uint8_t flags)
 
     cons->chan = chan;
     cons->consumer_tag = NULL;
-    STQUEUE_INIT(&cons->pending_content);
     mrkthr_signal_init(&cons->content_sig, NULL);
+    STQUEUE_INIT(&cons->pending_content);
     cons->content_thread = NULL;
     cons->content_cb = NULL;
     cons->cancel_cb = NULL;
@@ -1904,11 +1910,9 @@ amqp_consumer_destroy(amqp_consumer_t **cons)
     if (*cons != NULL) {
         amqp_pending_content_t *pc;
 
+        (*cons)->chan = NULL;
         BYTES_DECREF(&(*cons)->consumer_tag);
-        if (mrkthr_signal_has_owner(&(*cons)->content_sig)) {
-            mrkthr_signal_send(&(*cons)->content_sig);
-            mrkthr_signal_fini(&(*cons)->content_sig);
-        }
+        assert(!mrkthr_signal_has_owner(&(*cons)->content_sig));
         while ((pc = STQUEUE_HEAD(&(*cons)->pending_content)) != NULL) {
             STQUEUE_DEQUEUE(&(*cons)->pending_content, link);
             STQUEUE_ENTRY_FINI(link, pc);
@@ -2134,7 +2138,9 @@ content_thread_worker(UNUSED int argc, void **argv)
     }
 
 end:
+    mrkthr_signal_fini(&cons->content_sig);
     MRKTHRET(res);
+
 err:
     TR(res);
     goto end;

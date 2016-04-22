@@ -31,7 +31,6 @@ typedef struct _amqp_conn {
     uint32_t payload_max;
     uint16_t heartbeat;
     int capabilities;
-    uint64_t since_last_frame;
 
     int fd;
     bytestream_t ins;
@@ -89,8 +88,8 @@ typedef int (*amqp_consumer_content_cb_t)(amqp_frame_t *,
 typedef struct _amqp_consumer {
     amqp_channel_t *chan;
     bytes_t *consumer_tag;
-    STQUEUE(_amqp_pending_content, pending_content);
     mrkthr_signal_t content_sig;
+    STQUEUE(_amqp_pending_content, pending_content);
     mrkthr_ctx_t *content_thread;
     amqp_consumer_content_cb_t content_cb;
     amqp_consumer_content_cb_t cancel_cb;
@@ -188,7 +187,6 @@ int amqp_conn_open(amqp_conn_t *);
 int amqp_conn_run(amqp_conn_t *);
 mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
 MRKAMQP_SYNC int amqp_conn_close(amqp_conn_t *);
-void amqp_conn_close_hard(amqp_conn_t *);
 
 
 /*
