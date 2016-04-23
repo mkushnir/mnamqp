@@ -25,7 +25,8 @@ static amqp_conn_t *conn = NULL;
 static int
 _shutdown(UNUSED int argc, UNUSED void **argv)
 {
-    amqp_conn_close(conn);
+    amqp_conn_close(conn, 0);
+    amqp_conn_post_close(conn);
     amqp_conn_destroy(&conn);
     mrkamqp_fini();
     //mrkthr_fini();
@@ -194,7 +195,8 @@ run(UNUSED int argc, UNUSED void **argv)
     }
 
 end:
-    amqp_conn_close(conn);
+    amqp_conn_close(conn, 0);
+    amqp_conn_post_close(conn);
     amqp_conn_destroy(&conn);
     return res;
 

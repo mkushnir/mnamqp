@@ -69,7 +69,8 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
         TRACE("Shutting down. Another signal will cause immediate exit.");
         shutting_down = 1;
         if (conn != NULL) {
-            amqp_conn_close(conn);
+            amqp_conn_close(conn, 0);
+            amqp_conn_post_close(conn);
         }
         amqp_conn_destroy(&conn);
         _shutdown();
@@ -204,7 +205,8 @@ run_conn(void)
 
 end:
     if (conn != NULL) {
-        (void)amqp_conn_close(conn);
+        (void)amqp_conn_close(conn, 0);
+        amqp_conn_post_close(conn);
     }
     amqp_conn_destroy(&conn);
     return res;
@@ -239,7 +241,8 @@ end:
 
 err:
     TR(res);
-    amqp_conn_close(conn);
+    amqp_conn_close(conn, 0);
+    amqp_conn_post_close(conn);
     amqp_conn_destroy(&conn);
     goto end;
 }

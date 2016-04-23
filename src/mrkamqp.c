@@ -973,6 +973,8 @@ consumer_stop_threads_cb(UNUSED bytes_t *key,
         if ((res = mrkthr_join(cons->content_thread)) != 0) {
             //CTRACE("could not see content thread");
         }
+        //CTRACE("content thread after join: %p", cons->content_thread);
+        //mrkthr_dump(cons->content_thread);
         cons->content_thread = NULL;
     }
     return 0;
@@ -995,11 +997,16 @@ channel_stop_threads_cb(amqp_channel_t **chan, UNUSED void *udata)
         if ((res = mrkthr_join((*chan)->expect_sig.owner)) != 0) {
             //CTRACE("could not see expect thread, error: %s", mrkthr_diag_str(res));
         }
+        //CTRACE("expect thread after join: %p", (*chan)->expect_sig.owner);
+        //mrkthr_dump((*chan)->expect_sig.owner);
         /* expect must have exited by now so finalize for sanity */
         if (mrkthr_signal_has_owner(&(*chan)->expect_sig)) {
-            CTRACE(FRED("expect signal owner is not expected here: %p"), (*chan)->expect_sig.owner);
+            //CTRACE(FRED("expect signal owner is not expected here: %p"), (*chan)->expect_sig.owner);
+            //mrkthr_dump_all_ctxes();
         }
         mrkthr_signal_fini(&(*chan)->expect_sig);
+    } else {
+        //CTRACE("expect sig has no owner, OK");
     }
     return 0;
 }
@@ -1017,6 +1024,8 @@ amqp_conn_stop_threads(amqp_conn_t *conn)
         if ((res = mrkthr_set_interrupt_and_join(conn->send_thread)) != 0) {
             //CTRACE("could not see send thread, error: %s", mrkthr_diag_str(res));
         }
+        //CTRACE("send thread after join: %p", conn->send_thread);
+        //mrkthr_dump(conn->send_thread);
         conn->send_thread = NULL;
     }
     if (conn->recv_thread != NULL) {
@@ -1025,10 +1034,21 @@ amqp_conn_stop_threads(amqp_conn_t *conn)
         if ((res = mrkthr_set_interrupt_and_join(conn->recv_thread)) != 0) {
             //CTRACE("could not see recv thread, error: %s", mrkthr_diag_str(res));
         }
+        //CTRACE("recv thread after join: %p", conn->recv_thread);
+        //mrkthr_dump(conn->recv_thread);
     }
     //CTRACE("channels traverse %p", &conn->channels);
     (void)array_traverse(&conn->channels,
                          (array_traverser_t)channel_stop_threads_cb, NULL);
+}
+
+
+static int
+close_channel_fast_cb(amqp_channel_t **chan, UNUSED void *udata)
+{
+    assert(*chan != NULL);
+    (void)amqp_close_channel_fast(*chan);
+    return 0;
 }
 
 
@@ -1042,7 +1062,7 @@ close_channel_cb(amqp_channel_t **chan, UNUSED void *udata)
 
 
 int
-amqp_conn_close(amqp_conn_t *conn)
+amqp_conn_close(amqp_conn_t *conn, int flags)
 {
     int res;
     amqp_frame_t *fr0, *fr1;
@@ -1063,8 +1083,13 @@ amqp_conn_close(amqp_conn_t *conn)
      */
     conn->chan0->closed = 1;
     //CTRACE("channels traverse %p", &conn->channels);
-    (void)array_traverse(&conn->channels,
-                   (array_traverser_t)close_channel_cb, NULL);
+    if (flags & AMQP_CONN_CLOSE_FFAST) {
+        (void)array_traverse(&conn->channels,
+                       (array_traverser_t)close_channel_fast_cb, NULL);
+    } else {
+        (void)array_traverse(&conn->channels,
+                       (array_traverser_t)close_channel_cb, NULL);
+    }
 
     if (mrkthr_sema_acquire(&conn->chan0->sync_sema) != 0) {
         res = AMQP_CONN_CLOSE + 2;
@@ -1091,8 +1116,6 @@ amqp_conn_close(amqp_conn_t *conn)
 
 end:
     amqp_frame_destroy_method(&fr0);
-    amqp_conn_stop_threads(conn);
-    amqp_conn_close_fd(conn);
     return res;
 
 err:
@@ -1102,10 +1125,10 @@ err:
 
 
 void
-amqp_conn_close_dirty(amqp_conn_t *conn)
+amqp_conn_post_close(amqp_conn_t *conn)
 {
     if (conn->closed) {
-        //CTRACE("double amqp_conn_close_dirty");
+        //CTRACE("double amqp_conn_post_close");
         return;
     }
 
@@ -1702,6 +1725,14 @@ amqp_channel_publish(amqp_channel_t *chan,
         TRRET(CHANNEL_PUBLISH + 1);
     }
 
+    /*
+     * 4.2.6 Content Framing: content should be synchronized with
+     *   non-content.
+     */
+    if (mrkthr_sema_acquire(&chan->sync_sema) != 0) {
+        TRRET(CHANNEL_PUBLISH + 2);
+    }
+
     STQUEUE_ENTRY_INIT(link, &pp);
     mrkthr_signal_init(&pp.sig, mrkthr_me());
     pp.publish_tag = ++chan->publish_tag;
@@ -1757,6 +1788,8 @@ amqp_channel_publish(amqp_channel_t *chan,
     }
 
     mrkthr_signal_fini(&pp.sig);
+
+    mrkthr_sema_release(&chan->sync_sema);
     return res;
 }
 
@@ -1835,6 +1868,33 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
 
     mrkthr_signal_fini(&pp.sig);
     return res;
+}
+
+
+/*
+ * closing
+ */
+static int
+close_consumer_fast_cb(UNUSED bytes_t *key,
+                  amqp_consumer_t*cons,
+                  UNUSED void *udata)
+{
+    assert(cons != NULL);
+    amqp_close_consumer_fast(cons);
+    return 0;
+}
+
+
+void
+amqp_close_channel_fast(amqp_channel_t *chan)
+{
+    if (chan->closed) {
+        return;
+    }
+    (void)hash_traverse(&chan->consumers,
+                        (hash_traverser_t)close_consumer_fast_cb, NULL);
+    chan->closed = 1;
+
 }
 
 
@@ -2255,6 +2315,17 @@ amqp_consumer_handle_content(amqp_consumer_t *cons,
     cons->content_udata = udata;
     return content_thread_worker(1, (void **)(&cons));
 }
+
+
+void
+amqp_close_consumer_fast(amqp_consumer_t *cons)
+{
+    if (!cons->closed) {
+        cons->closed = 1;
+        BYTES_DECREF(&cons->consumer_tag);
+    }
+}
+
 
 int
 amqp_close_consumer(amqp_consumer_t *cons)

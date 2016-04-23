@@ -186,8 +186,9 @@ void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
 int amqp_conn_run(amqp_conn_t *);
 mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
-MRKAMQP_SYNC int amqp_conn_close(amqp_conn_t *);
-void amqp_conn_close_dirty(amqp_conn_t *);
+#define AMQP_CONN_CLOSE_FFAST (0x01)
+MRKAMQP_SYNC int amqp_conn_close(amqp_conn_t *, int);
+void amqp_conn_post_close(amqp_conn_t *);
 
 
 /*
@@ -197,6 +198,8 @@ MRKAMQP_SYNC amqp_channel_t *amqp_create_channel(amqp_conn_t *);
 #define CHANNEL_CONFIRM_FNOWAIT         0x01
 MRKAMQP_SYNC int amqp_channel_confirm(amqp_channel_t *, uint8_t);
 MRKAMQP_SYNC int amqp_close_channel(amqp_channel_t *);
+void amqp_close_channel_fast(amqp_channel_t *);
+
 #define DECLARE_EXCHANGE_FPASSIVE       0x01
 #define DECLARE_EXCHANGE_FDURABLE       0x02
 #define DECLARE_EXCHANGE_FAUTODELETE    0x04
@@ -206,6 +209,7 @@ MRKAMQP_SYNC int amqp_channel_declare_exchange(amqp_channel_t *,
                                                const char *,
                                                const char *,
                                                uint8_t);
+
 #define DELETE_EXCHANGE_FIFUNUSED       0x01
 #define DELETE_EXCHANGE_FNOWAIT         0x02
 MRKAMQP_SYNC int amqp_channel_delete_exchange(amqp_channel_t *,
@@ -220,31 +224,37 @@ MRKAMQP_SYNC int amqp_channel_delete_exchange(amqp_channel_t *,
 MRKAMQP_SYNC int amqp_channel_declare_queue(amqp_channel_t *,
                                             const char *,
                                             uint8_t);
+
 #define BIND_QUEUE_FNOWAIT              0x01
 MRKAMQP_SYNC int amqp_channel_bind_queue(amqp_channel_t *,
                                          const char *,
                                          const char *,
                                          const char *,
                                          uint8_t);
+
 MRKAMQP_SYNC int amqp_channel_unbind_queue(amqp_channel_t *,
                                            const char *,
                                            const char *,
                                            const char *);
+
 #define PURGE_QUEUE_FNOWAIT             0x01
 MRKAMQP_SYNC int amqp_channel_purge_queue(amqp_channel_t *,
                                           const char *,
                                           uint8_t);
+
 #define DELETE_QUEUE_FIFUNUSED          0x01
 #define DELETE_QUEUE_FIFEMPTY           0x02
 #define DELETE_QUEUE_FNOWAIT            0x04
 MRKAMQP_SYNC int amqp_channel_delete_queue(amqp_channel_t *,
                               const char *,
                               uint8_t);
+
 #define QOS_FGLOBAL                     0x01
 MRKAMQP_SYNC int amqp_channel_qos(amqp_channel_t *,
                      uint32_t,
                      uint16_t,
                      uint8_t);
+
 #if 0 // see amqp_channel_create_consumer()
 #define CONSUME_FNOLOCAL                0x01
 #define CONSUME_FNOACK                  0x02
@@ -255,6 +265,7 @@ int amqp_channel_consume(amqp_channel_t *,
                          const char *,
                          uint8_t);
 #endif
+
 #define CANCEL_FNOWAIT                  0x01
 int amqp_channel_cancel(amqp_channel_t *,
                         const char *,
@@ -265,6 +276,7 @@ int amqp_channel_cancel(amqp_channel_t *,
 typedef void (*amqp_header_completion_cb)(amqp_channel_t *,
                                           amqp_header_t *,
                                           void *);
+
 int amqp_channel_publish(amqp_channel_t *,
                          const char *,
                          const char *,
@@ -273,6 +285,7 @@ int amqp_channel_publish(amqp_channel_t *,
                          void *,
                          const char *,
                          ssize_t);
+
 int amqp_channel_publish_ex(amqp_channel_t *,
                             const char *,
                             const char *,
@@ -305,6 +318,7 @@ int amqp_consumer_handle_content(amqp_consumer_t *,
                                  void *);
 void amqp_consumer_reset_content_state(amqp_consumer_t *);
 MRKAMQP_SYNC int amqp_close_consumer(amqp_consumer_t *);
+void amqp_close_consumer_fast(amqp_consumer_t *);
 
 
 /*
