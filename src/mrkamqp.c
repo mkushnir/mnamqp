@@ -1510,8 +1510,6 @@ amqp_channel_delete_exchange(amqp_channel_t *chan,
                              const char *exchange,
                              uint8_t flags)
 {
-
-
     AMQP_CHANNEL_METHOD_PAIR_NOWAIT(exchange_delete,
                                     DELETE_EXCHANGE_FNOWAIT,
                                     AMQP_EXCHANGE_DELETE_OK,

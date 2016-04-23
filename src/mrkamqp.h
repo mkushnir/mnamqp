@@ -184,8 +184,7 @@ amqp_conn_t *amqp_conn_new(const char *,
                            int);
 void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
-int amqp_conn_run(amqp_conn_t *);
-mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
+MRKAMQP_SYNC int amqp_conn_run(amqp_conn_t *);
 #define AMQP_CONN_CLOSE_FFAST (0x01)
 MRKAMQP_SYNC int amqp_conn_close(amqp_conn_t *, int);
 void amqp_conn_post_close(amqp_conn_t *);
@@ -277,7 +276,7 @@ typedef void (*amqp_header_completion_cb)(amqp_channel_t *,
                                           amqp_header_t *,
                                           void *);
 
-int amqp_channel_publish(amqp_channel_t *,
+MRKAMQP_SYNC int amqp_channel_publish(amqp_channel_t *,
                          const char *,
                          const char *,
                          uint8_t,
@@ -286,7 +285,7 @@ int amqp_channel_publish(amqp_channel_t *,
                          const char *,
                          ssize_t);
 
-int amqp_channel_publish_ex(amqp_channel_t *,
+MRKAMQP_SYNC int amqp_channel_publish_ex(amqp_channel_t *,
                             const char *,
                             const char *,
                             uint8_t,
@@ -308,15 +307,17 @@ MRKAMQP_SYNC amqp_consumer_t *amqp_channel_create_consumer(amqp_channel_t *,
                                                            const char *,
                                                            const char *,
                                                            uint8_t);
+
 int amqp_consumer_handle_content_spawn(amqp_consumer_t *,
                                        amqp_consumer_content_cb_t,
                                        amqp_consumer_content_cb_t,
                                        void *);
+
 int amqp_consumer_handle_content(amqp_consumer_t *,
                                  amqp_consumer_content_cb_t,
                                  amqp_consumer_content_cb_t,
                                  void *);
-void amqp_consumer_reset_content_state(amqp_consumer_t *);
+
 MRKAMQP_SYNC int amqp_close_consumer(amqp_consumer_t *);
 void amqp_close_consumer_fast(amqp_consumer_t *);
 
@@ -384,8 +385,9 @@ MRKAMQP_SYNC int amqp_rpc_setup_server(amqp_rpc_t *,
                                        amqp_rpc_server_handler_t,
                                        void *);
 int amqp_rpc_run(amqp_rpc_t *);
+mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
 MRKAMQP_SYNC int amqp_rpc_teardown(amqp_rpc_t *);
-int amqp_rpc_call(amqp_rpc_t *,
+MRKAMQP_SYNC int amqp_rpc_call(amqp_rpc_t *,
                   const char *,
                   size_t,
                   amqp_rpc_request_header_cb_t,
