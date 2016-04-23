@@ -2264,7 +2264,7 @@ content_thread_worker(UNUSED int argc, void **argv)
             STQUEUE_ENTRY_FINI(link, pc);
             amqp_pending_content_destroy(&pc);
 
-            BYTES_DECREF(&cons->consumer_tag);
+            //BYTES_DECREF(&cons->consumer_tag);
             cons->closed = 1;
 
             if (res != 0) {
@@ -2322,7 +2322,7 @@ amqp_close_consumer_fast(amqp_consumer_t *cons)
 {
     if (!cons->closed) {
         cons->closed = 1;
-        BYTES_DECREF(&cons->consumer_tag);
+        //BYTES_DECREF(&cons->consumer_tag);
     }
 }
 
@@ -2338,7 +2338,7 @@ amqp_close_consumer(amqp_consumer_t *cons)
                                 0) != 0) {
             TR(AMQP_CLOSE_CONSUMER + 1);
         }
-        BYTES_DECREF(&cons->consumer_tag);
+        //BYTES_DECREF(&cons->consumer_tag);
     }
     return 0;
 }
