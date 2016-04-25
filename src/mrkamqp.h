@@ -40,6 +40,7 @@ typedef struct _amqp_conn {
     /* outgoing frames */
     STQUEUE(_amqp_frame, oframes);
     mrkthr_signal_t oframe_sig;
+    mrkthr_signal_t ping_sig;
 
     array_t channels;
     struct _amqp_channel *chan0;
@@ -185,6 +186,7 @@ amqp_conn_t *amqp_conn_new(const char *,
 void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
 MRKAMQP_SYNC int amqp_conn_run(amqp_conn_t *);
+int amqp_conn_ping(amqp_conn_t *);
 #define AMQP_CONN_CLOSE_FFAST (0x01)
 MRKAMQP_SYNC int amqp_conn_close(amqp_conn_t *, int);
 void amqp_conn_post_close(amqp_conn_t *);

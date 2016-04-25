@@ -97,6 +97,7 @@ amqp_conn_new(const char *host,
     conn->send_thread = NULL;
     STQUEUE_INIT(&conn->oframes);
     mrkthr_signal_init(&conn->oframe_sig, NULL);
+    mrkthr_signal_init(&conn->ping_sig, NULL);
 
     //CTRACE("channels init %p", &conn->channels);
     array_init(&conn->channels, sizeof(amqp_channel_t *), 0,
@@ -618,9 +619,13 @@ next_frame(amqp_conn_t *conn)
                 goto err; // 501 frame error
             }
 
-            fr1 = amqp_frame_new((*chan)->id, AMQP_FHEARTBEAT);
-            channel_send_frame(*chan, fr1);
-            fr1 = NULL;
+            if (mrkthr_signal_has_owner(&conn->ping_sig)) {
+                mrkthr_signal_send(&conn->ping_sig);
+            } else {
+                fr1 = amqp_frame_new((*chan)->id, AMQP_FHEARTBEAT);
+                channel_send_frame(*chan, fr1);
+                fr1 = NULL;
+            }
         }
         break;
 
@@ -947,6 +952,22 @@ err:
 }
 
 
+int
+amqp_conn_ping(amqp_conn_t *conn)
+{
+    int res;
+    amqp_frame_t *fr;
+
+    mrkthr_signal_init(&conn->ping_sig, mrkthr_me());
+    fr = amqp_frame_new(conn->chan0->id, AMQP_FHEARTBEAT);
+    channel_send_frame(conn->chan0, fr);
+    fr = NULL;
+    res = mrkthr_signal_subscribe(&conn->ping_sig);
+    mrkthr_signal_fini(&conn->ping_sig);
+    return res;
+}
+
+
 static void
 amqp_conn_close_fd(amqp_conn_t *conn)
 {
@@ -1015,8 +1036,13 @@ channel_stop_threads_cb(amqp_channel_t **chan, UNUSED void *udata)
 static void
 amqp_conn_stop_threads(amqp_conn_t *conn)
 {
+    if (mrkthr_signal_has_owner(&conn->ping_sig)) {
+        mrkthr_signal_error_and_join(&conn->ping_sig, MRKAMQP_STOP_THREADS);
+        /* XXX join? */
+    }
     if (mrkthr_signal_has_owner(&conn->oframe_sig)) {
-        mrkthr_signal_error(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
+        mrkthr_signal_error_and_join(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
+        /* XXX join? */
     }
     if (conn->send_thread != NULL) {
         int res;
