@@ -99,7 +99,6 @@ amqp_conn_new(const char *host,
     mrkthr_signal_init(&conn->oframe_sig, NULL);
     mrkthr_signal_init(&conn->ping_sig, NULL);
 
-    //CTRACE("channels init %p", &conn->channels);
     array_init(&conn->channels, sizeof(amqp_channel_t *), 0,
                NULL,
                (array_finalizer_t)amqp_channel_destroy);
@@ -327,7 +326,6 @@ next_frame(amqp_conn_t *conn)
     /* rewind bs at payload start and ... */
     SPOS(&conn->ins) = spos;
 
-    //CTRACE("channels get %p", &conn->channels);
     if ((chan = array_get(&conn->channels, fr->chan)) == NULL) {
         res = UNPACK + 205;
         goto err;
@@ -491,7 +489,6 @@ next_frame(amqp_conn_t *conn)
             } else {
                 STQUEUE_ENQUEUE(&(*chan)->iframes, link, fr);
                 mrkthr_signal_send(&(*chan)->expect_sig);
-                //CTRACE("signal sent to expect sig");
             }
         }
         break;
@@ -669,7 +666,6 @@ recv_thread_worker(UNUSED int argc, void **argv)
         }
     }
 
-    //CTRACE("Exiting recv_tread ...");
     return 0;
 }
 
@@ -757,7 +753,6 @@ send_thread_worker(UNUSED int argc, void **argv)
 
         if ((fr = STQUEUE_HEAD(&conn->oframes)) == NULL) {
             if (mrkthr_signal_subscribe(&conn->oframe_sig) != 0) {
-                //CTRACE("send_thread interrupted");
                 break;
             }
         } else {
@@ -773,13 +768,11 @@ send_thread_worker(UNUSED int argc, void **argv)
             pack_frame(conn, fr);
             amqp_frame_destroy(&fr);
             if (bytestream_produce_data(&conn->outs, conn->fd) != 0) {
-                //CTRACE("send_thread interrupted");
                 break;
             }
         }
     }
     mrkthr_signal_fini(&conn->oframe_sig);
-    //CTRACE("exiting send thread ...");
     return 0;
 }
 
@@ -958,12 +951,20 @@ amqp_conn_ping(amqp_conn_t *conn)
     int res;
     amqp_frame_t *fr;
 
+    res = 0;
+    if (mrkthr_sema_acquire(&conn->chan0->sync_sema) != 0) {
+        res = AMQP_CONN_PING + 1;
+        goto end;
+    }
     mrkthr_signal_init(&conn->ping_sig, mrkthr_me());
     fr = amqp_frame_new(conn->chan0->id, AMQP_FHEARTBEAT);
     channel_send_frame(conn->chan0, fr);
     fr = NULL;
     res = mrkthr_signal_subscribe(&conn->ping_sig);
     mrkthr_signal_fini(&conn->ping_sig);
+
+end:
+    mrkthr_sema_release(&conn->chan0->sync_sema);
     return res;
 }
 
@@ -990,12 +991,9 @@ consumer_stop_threads_cb(UNUSED bytes_t *key,
     }
     if (cons->content_thread != NULL) {
         int res;
-        //CTRACE("joining content thread ...");
         if ((res = mrkthr_join(cons->content_thread)) != 0) {
             //CTRACE("could not see content thread");
         }
-        //CTRACE("content thread after join: %p", cons->content_thread);
-        //mrkthr_dump(cons->content_thread);
         cons->content_thread = NULL;
     }
     return 0;
@@ -1011,21 +1009,19 @@ channel_stop_threads_cb(amqp_channel_t **chan, UNUSED void *udata)
                         (hash_traverser_t)consumer_stop_threads_cb, NULL);
 
     if (mrkthr_signal_has_owner(&(*chan)->expect_sig)) {
-        int res;
-
         mrkthr_signal_error(&(*chan)->expect_sig, MRKAMQP_STOP_THREADS);
-        //CTRACE("joining expect sig owner %p ...", (*chan)->expect_sig.owner);
-        if ((res = mrkthr_join((*chan)->expect_sig.owner)) != 0) {
+
+        if (mrkthr_join((*chan)->expect_sig.owner) != 0) {
             //CTRACE("could not see expect thread, error: %s", mrkthr_diag_str(res));
         }
-        //CTRACE("expect thread after join: %p", (*chan)->expect_sig.owner);
-        //mrkthr_dump((*chan)->expect_sig.owner);
         /* expect must have exited by now so finalize for sanity */
         if (mrkthr_signal_has_owner(&(*chan)->expect_sig)) {
             //CTRACE(FRED("expect signal owner is not expected here: %p"), (*chan)->expect_sig.owner);
             //mrkthr_dump_all_ctxes();
         }
+
         mrkthr_signal_fini(&(*chan)->expect_sig);
+
     } else {
         //CTRACE("expect sig has no owner, OK");
     }
@@ -1038,32 +1034,23 @@ amqp_conn_stop_threads(amqp_conn_t *conn)
 {
     if (mrkthr_signal_has_owner(&conn->ping_sig)) {
         mrkthr_signal_error_and_join(&conn->ping_sig, MRKAMQP_STOP_THREADS);
-        /* XXX join? */
     }
     if (mrkthr_signal_has_owner(&conn->oframe_sig)) {
         mrkthr_signal_error_and_join(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
-        /* XXX join? */
     }
     if (conn->send_thread != NULL) {
         int res;
-        //CTRACE("interrupting and joining send thread %p...", conn->send_thread);
         if ((res = mrkthr_set_interrupt_and_join(conn->send_thread)) != 0) {
             //CTRACE("could not see send thread, error: %s", mrkthr_diag_str(res));
         }
-        //CTRACE("send thread after join: %p", conn->send_thread);
-        //mrkthr_dump(conn->send_thread);
         conn->send_thread = NULL;
     }
     if (conn->recv_thread != NULL) {
         int res;
-        //CTRACE("interrupting and joining recv thread %p...", conn->recv_thread);
         if ((res = mrkthr_set_interrupt_and_join(conn->recv_thread)) != 0) {
             //CTRACE("could not see recv thread, error: %s", mrkthr_diag_str(res));
         }
-        //CTRACE("recv thread after join: %p", conn->recv_thread);
-        //mrkthr_dump(conn->recv_thread);
     }
-    //CTRACE("channels traverse %p", &conn->channels);
     (void)array_traverse(&conn->channels,
                          (array_traverser_t)channel_stop_threads_cb, NULL);
 }
@@ -1073,7 +1060,7 @@ static int
 close_channel_fast_cb(amqp_channel_t **chan, UNUSED void *udata)
 {
     assert(*chan != NULL);
-    (void)amqp_close_channel_fast(*chan);
+    amqp_close_channel_fast(*chan);
     return 0;
 }
 
@@ -1108,7 +1095,6 @@ amqp_conn_close(amqp_conn_t *conn, int flags)
      * chan0 cannot be "closed" by AMQP
      */
     conn->chan0->closed = 1;
-    //CTRACE("channels traverse %p", &conn->channels);
     if (flags & AMQP_CONN_CLOSE_FFAST) {
         (void)array_traverse(&conn->channels,
                        (array_traverser_t)close_channel_fast_cb, NULL);
@@ -1175,7 +1161,6 @@ amqp_conn_destroy(amqp_conn_t **conn)
 
         amqp_conn_close_fd(*conn); //sanity
 
-        //CTRACE("channels fini %p", &(*conn)->channels);
         array_fini(&(*conn)->channels);
         while ((fr = STQUEUE_HEAD(&(*conn)->oframes)) != NULL) {
             STQUEUE_DEQUEUE(&(*conn)->oframes, link);
@@ -1213,7 +1198,6 @@ amqp_channel_new(amqp_conn_t *conn)
 {
     amqp_channel_t **chan;
 
-    //CTRACE("channels incr %p", &conn->channels);
     if ((chan = array_incr(&conn->channels)) == NULL) {
         FAIL("array_incr");
     }
@@ -1262,7 +1246,6 @@ channel_expect_method(amqp_channel_t *chan,
     mrkthr_signal_init(&chan->expect_sig, mrkthr_me());
     res = 0;
 
-    //CTRACE("subscribing to expect sig ...");
     if (mrkthr_signal_subscribe(&chan->expect_sig) != 0) {
         res = CHANNEL_EXPECT_METHOD + 1;
         TR(res);
@@ -1329,7 +1312,7 @@ amqp_channel_destroy(amqp_channel_t **chan)
         /* must have been finalized in channel_expect_method() */
         if (mrkthr_signal_has_owner(&(*chan)->expect_sig)) {
             //CTRACE("signal owner has owner %p", (*chan)->expect_sig.owner);
-            mrkthr_dump((*chan)->expect_sig.owner);
+            //mrkthr_dump((*chan)->expect_sig.owner);
         }
         assert(!mrkthr_signal_has_owner(&(*chan)->expect_sig));
         hash_fini(&(*chan)->consumers);
@@ -1918,7 +1901,6 @@ amqp_close_channel_fast(amqp_channel_t *chan)
     (void)hash_traverse(&chan->consumers,
                         (hash_traverser_t)close_consumer_fast_cb, NULL);
     chan->closed = 1;
-
 }
 
 
