@@ -623,6 +623,7 @@ next_frame(amqp_conn_t *conn)
                 channel_send_frame(*chan, fr1);
                 fr1 = NULL;
             }
+            amqp_frame_destroy(&fr);
         }
         break;
 
