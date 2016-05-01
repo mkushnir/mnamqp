@@ -437,7 +437,8 @@ next_frame(amqp_conn_t *conn)
                             CTRACE("got basic.ack deliver_tag=%ld "
                                    "expected >=%ld",
                                    m->delivery_tag, pp->publish_tag);
-                            mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
+                            // XXX might be already dead
+                            //mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
                         }
                     }
 
@@ -456,7 +457,8 @@ next_frame(amqp_conn_t *conn)
                         } else {
                             CTRACE("got basic.ack deliver_tag=%ld expected %ld",
                                    m->delivery_tag, pp->publish_tag);
-                            mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
+                            // XXX might be already dead
+                            //mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
                         }
                     } else {
                         CTRACE("got basic.ack deliver_tag=%ld none expected",
