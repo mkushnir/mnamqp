@@ -1147,8 +1147,8 @@ amqp_conn_post_close(amqp_conn_t *conn)
         return;
     }
 
-    amqp_conn_stop_threads(conn);
     amqp_conn_close_fd(conn);
+    amqp_conn_stop_threads(conn);
 }
 
 
