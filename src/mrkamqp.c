@@ -2051,7 +2051,10 @@ amqp_consumer_destroy(amqp_consumer_t **cons)
 
         (*cons)->chan = NULL;
         BYTES_DECREF(&(*cons)->consumer_tag);
-        assert(!mrkthr_signal_has_owner(&(*cons)->content_sig));
+        if (mrkthr_signal_has_owner(&(*cons)->content_sig)) {
+            CTRACE("content_sig owner found during consumer destroy: %p", (*cons)->content_sig.owner);
+        }
+        //assert(!mrkthr_signal_has_owner(&(*cons)->content_sig));
         while ((pc = STQUEUE_HEAD(&(*cons)->pending_content)) != NULL) {
             STQUEUE_DEQUEUE(&(*cons)->pending_content, link);
             STQUEUE_ENTRY_FINI(link, pc);
