@@ -457,7 +457,7 @@ next_frame(amqp_conn_t *conn)
                         } else {
                             CTRACE("got basic.ack deliver_tag=%ld expected %ld",
                                    m->delivery_tag, pp->publish_tag);
-                            // XXX might be already dead
+                            // XXX must be already dead, or out of scope
                             //mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
                         }
                     } else {
