@@ -1743,7 +1743,7 @@ amqp_channel_publish(amqp_channel_t *chan,
         TRRET(CHANNEL_PUBLISH + 2);
     }
 
-    STQUEUE_ENTRY_INIT(link, &pp);
+    DTQUEUE_ENTRY_INIT(link, &pp);
     mrkthr_signal_init(&pp.sig, mrkthr_me());
     pp.publish_tag = ++chan->publish_tag;
 
@@ -1828,7 +1828,7 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
         TRRET(CHANNEL_PUBLISH + 3);
     }
 
-    STQUEUE_ENTRY_INIT(link, &pp);
+    DTQUEUE_ENTRY_INIT(link, &pp);
     mrkthr_signal_init(&pp.sig, mrkthr_me());
     pp.publish_tag = ++chan->publish_tag;
 
