@@ -424,9 +424,9 @@ next_frame(amqp_conn_t *conn)
                 m = (amqp_basic_ack_t *)fr->payload.params;
                 if (m->flags & ACK_MULTIPLE) {
                     while ((pp =
-                            STQUEUE_HEAD(&(*chan)->pending_pub)) != NULL) {
-                        STQUEUE_DEQUEUE(&(*chan)->pending_pub, link);
-                        STQUEUE_ENTRY_FINI(link, pp);
+                            DTQUEUE_HEAD(&(*chan)->pending_pub)) != NULL) {
+                        DTQUEUE_DEQUEUE(&(*chan)->pending_pub, link);
+                        DTQUEUE_ENTRY_FINI(link, pp);
 
                         if (m->delivery_tag > pp->publish_tag) {
                             mrkthr_signal_send(&pp->sig);
@@ -448,9 +448,9 @@ next_frame(amqp_conn_t *conn)
                     }
 
                 } else {
-                    if ((pp = STQUEUE_HEAD(&(*chan)->pending_pub)) != NULL) {
-                        STQUEUE_DEQUEUE(&(*chan)->pending_pub, link);
-                        STQUEUE_ENTRY_FINI(link, pp);
+                    if ((pp = DTQUEUE_HEAD(&(*chan)->pending_pub)) != NULL) {
+                        DTQUEUE_DEQUEUE(&(*chan)->pending_pub, link);
+                        DTQUEUE_ENTRY_FINI(link, pp);
 
                         if (pp->publish_tag == m->delivery_tag) {
                             mrkthr_signal_send(&pp->sig);
@@ -1219,7 +1219,7 @@ amqp_channel_new(amqp_conn_t *conn)
               (hash_item_finalizer_t)amqp_consumer_item_fini);
     (*chan)->content_consumer = NULL;
     (*chan)->publish_tag = 0ll;
-    STQUEUE_INIT(&(*chan)->pending_pub);
+    DTQUEUE_INIT(&(*chan)->pending_pub);
     (*chan)->confirm_mode = 0;
     (*chan)->closed = 1;
     return *chan;
@@ -1789,8 +1789,9 @@ amqp_channel_publish(amqp_channel_t *chan,
     fr1 = NULL;
 
     if (chan->confirm_mode) {
-        STQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
+        DTQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
         if ((res = mrkthr_signal_subscribe(&pp.sig)) != 0) {
+            DTQUEUE_REMOVE(&chan->pending_pub, link, &pp);
             if (res != MRKAMQP_PROTOCOL_ERROR) {
                 res = CHANNEL_PUBLISH + 2;
             }
@@ -1868,8 +1869,9 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     fr1 = NULL;
 
     if (chan->confirm_mode) {
-        STQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
+        DTQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
         if ((res = mrkthr_signal_subscribe(&pp.sig)) != 0) {
+            DTQUEUE_REMOVE(&chan->pending_pub, link, &pp);
             if (res != MRKAMQP_PROTOCOL_ERROR) {
                 res = CHANNEL_PUBLISH + 4;
             }

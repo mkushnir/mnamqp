@@ -51,7 +51,7 @@ typedef struct _amqp_conn {
 
 
 typedef struct _amqp_pending_pub {
-    STQUEUE_ENTRY(_amqp_pending_pub, link);
+    DTQUEUE_ENTRY(_amqp_pending_pub, link);
     mrkthr_signal_t sig;
     uint64_t publish_tag;
 } amqp_pending_pub_t;
@@ -67,7 +67,7 @@ typedef struct _amqp_channel {
     /* weak ref */
     struct _amqp_consumer *content_consumer;
     uint64_t publish_tag;
-    STQUEUE(_amqp_pending_pub, pending_pub);
+    DTQUEUE(_amqp_pending_pub, pending_pub);
     int id;
     int confirm_mode:1;
     int closed:1;
