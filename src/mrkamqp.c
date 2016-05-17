@@ -448,20 +448,19 @@ next_frame(amqp_conn_t *conn)
                     }
 
                 } else {
-                    if ((pp = DTQUEUE_HEAD(&(*chan)->pending_pub)) != NULL) {
-                        DTQUEUE_DEQUEUE(&(*chan)->pending_pub, link);
-                        DTQUEUE_ENTRY_FINI(link, pp);
+
+                    for (pp = DTQUEUE_HEAD(&(*chan)->pending_pub);
+                         pp != NULL;
+                         pp = DTQUEUE_NEXT(link, pp)) {
 
                         if (pp->publish_tag == m->delivery_tag) {
+                            DTQUEUE_REMOVE(&(*chan)->pending_pub, link, pp);
                             mrkthr_signal_send(&pp->sig);
-                        } else {
-                            CTRACE("got basic.ack deliver_tag=%ld expected %ld",
-                                   m->delivery_tag, pp->publish_tag);
-                            // XXX must be already dead, or out of scope
-                            //mrkthr_signal_error(&pp->sig, MRKAMQP_PROTOCOL_ERROR);
+                            break;
                         }
-                    } else {
-                        CTRACE("got basic.ack deliver_tag=%ld none expected",
+                    }
+                    if (pp == NULL) {
+                        CTRACE("got basic.ack deliver_tag=%ld none expected (dup?)",
                                m->delivery_tag);
                     }
                 }
