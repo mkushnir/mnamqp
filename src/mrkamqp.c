@@ -95,6 +95,7 @@ amqp_conn_new(const char *host,
     conn->outs.write = mrkthr_bytestream_write;
     conn->recv_thread = NULL;
     conn->send_thread = NULL;
+    conn->heartbeat_thread = NULL;
     STQUEUE_INIT(&conn->oframes);
     mrkthr_signal_init(&conn->oframe_sig, NULL);
     mrkthr_signal_init(&conn->ping_sig, NULL);
@@ -263,6 +264,7 @@ receive_octets(amqp_conn_t *conn, amqp_frame_t *fr)
             if (bytestream_consume_data(&conn->ins, conn->fd) != 0) {
                 break;
             }
+            conn->last_sock_op = mrkthr_get_now();
         }
         need = MIN(fr->sz - nread, SEOD(&conn->ins) - SPOS(&conn->ins));
         memcpy(fr->payload.body + nread, SPDATA(&conn->ins), need);
@@ -310,6 +312,7 @@ next_frame(amqp_conn_t *conn)
             res = UNPACK_ECONSUME;
             goto err;
         }
+        conn->last_sock_op = mrkthr_get_now();
     }
 
     if (unpack_octet(&conn->ins, conn->fd, &eof) < 0) {
@@ -772,6 +775,7 @@ send_thread_worker(UNUSED int argc, void **argv)
             if (bytestream_produce_data(&conn->outs, conn->fd) != 0) {
                 break;
             }
+            conn->last_sock_op = mrkthr_get_now();
         }
     }
     mrkthr_signal_fini(&conn->oframe_sig);
@@ -780,11 +784,38 @@ send_thread_worker(UNUSED int argc, void **argv)
 
 
 static int
+heartbeat_thread_worker(UNUSED int argc, void **argv)
+{
+    amqp_conn_t *conn;
+
+    assert(argc == 1);
+    conn = argv[0];
+    while (!conn->closed) {
+        uint64_t now;
+
+        if (mrkthr_sleep(conn->heartbeat * 1000) != 0) {
+            break;
+        }
+        now = mrkthr_get_now();
+        if (((now - conn->last_sock_op) / 1000000000) > (conn->heartbeat / 2)) {
+            if (amqp_conn_ping(conn) != 0) {
+                break;
+            }
+        }
+    }
+    return 0;
+}
+
+static int
 send_raw_octets(amqp_conn_t *conn, uint8_t *octets, size_t sz)
 {
+    int res;
+
     bytestream_rewind(&conn->outs);
     (void)bytestream_cat(&conn->outs, sz, (char *)octets);
-    return bytestream_produce_data(&conn->outs, conn->fd);
+    res = bytestream_produce_data(&conn->outs, conn->fd);
+    conn->last_sock_op = mrkthr_get_now();
+    return res;
 }
 
 
@@ -822,10 +853,12 @@ amqp_conn_run(amqp_conn_t *conn)
         goto err;
     }
 
-    conn->recv_thread = mrkthr_spawn("amqrcv", recv_thread_worker, 1, conn);
+    conn->recv_thread = mrkthr_spawn("amqrecv", recv_thread_worker, 1, conn);
     mrkthr_set_prio(conn->recv_thread, 1);
-    conn->send_thread = mrkthr_spawn("amqsnd", send_thread_worker, 1, conn);
+    conn->send_thread = mrkthr_spawn("amqsend", send_thread_worker, 1, conn);
     mrkthr_set_prio(conn->send_thread, 1);
+    conn->heartbeat_thread = mrkthr_spawn("amqhrtb", heartbeat_thread_worker, 1, conn);
+    mrkthr_set_prio(conn->heartbeat_thread, 1);
 
     // >>> AMQP0091
     if (send_raw_octets(conn, (uint8_t *)greeting, sizeof(greeting)) != 0) {
@@ -1039,6 +1072,13 @@ amqp_conn_stop_threads(amqp_conn_t *conn)
     }
     if (mrkthr_signal_has_owner(&conn->oframe_sig)) {
         mrkthr_signal_error_and_join(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
+    }
+    if (conn->heartbeat_thread != NULL) {
+        int res;
+        if ((res = mrkthr_set_interrupt_and_join(conn->heartbeat_thread)) != 0) {
+            //CTRACE("could not see send thread, error: %s", mrkthr_diag_str(res));
+        }
+        conn->heartbeat_thread = NULL;
     }
     if (conn->send_thread != NULL) {
         int res;

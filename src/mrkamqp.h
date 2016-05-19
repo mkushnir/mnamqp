@@ -37,6 +37,8 @@ typedef struct _amqp_conn {
     bytestream_t outs;
     mrkthr_ctx_t *recv_thread;
     mrkthr_ctx_t *send_thread;
+    mrkthr_ctx_t *heartbeat_thread;
+    uint64_t last_sock_op;
     /* outgoing frames */
     STQUEUE(_amqp_frame, oframes);
     mrkthr_signal_t oframe_sig;
