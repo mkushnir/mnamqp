@@ -25,9 +25,9 @@ else
 DEBUG_FLAGS = -DNDEBUG -O3
 endif
 
-libmrkamqp_la_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
+libmrkamqp_la_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 @MRKCOMMON_LOCAL_CFLAGS@ @MRKTHR_LOCAL_CFLAGS@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
 
-libmrkamqp_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon -lmrkthr
+libmrkamqp_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon @MRKCOMMON_LOCAL_LDFLAGS@ -lmrkthr @MRKTHR_LOCAL_LDFLAGS@
 
 SUBDIRS = .
 
