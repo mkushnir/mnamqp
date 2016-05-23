@@ -2133,6 +2133,7 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
 
     fr0 = NULL;
     cons = NULL;
+    ctag = NULL;
 
     if ((flags & CONSUME_FNOWAIT) &&
         (consumer_tag == NULL || *consumer_tag == '\0')) {
