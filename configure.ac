@@ -68,7 +68,7 @@ AM_SILENT_RULES([yes])
 
 dnl AM_MAINTAINER_MODE
 
-AC_CHECK_HEADERS([arpa/inet.h endian.h sys/endian.h])
+AC_CHECK_HEADERS([arpa/inet.h endian.h sys/endian.h fcntl.h byteswap.h])
 AC_CHECK_HEADERS([netdb.h])
 AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([sys/socket.h])

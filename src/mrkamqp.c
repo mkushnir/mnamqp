@@ -1,16 +1,3 @@
-#ifdef HAVE_CONFIG_H
-#   include <config.h>
-#endif
-#ifdef HAVE_ENDIAN_H
-#   include <endian.h>
-#else
-#   ifdef HAVE_SYS_ENDIAN_H
-#       include <sys/endian.h>
-#   else
-#       error "Neither endian.h nor sys/endian.h found"
-#   endif
-#endif
-
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -2364,10 +2351,11 @@ amqp_consumer_handle_content(amqp_consumer_t *cons,
                              amqp_consumer_content_cb_t clcb,
                              void *udata)
 {
+    amqp_consumer_t **p = &cons;
     cons->content_cb = ctcb;
     cons->cancel_cb = clcb;
     cons->content_udata = udata;
-    return content_thread_worker(1, (void **)(&cons));
+    return content_thread_worker(1, (void **)p);
 }
 
 

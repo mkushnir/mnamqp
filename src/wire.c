@@ -1,15 +1,3 @@
-#ifdef HAVE_CONFIG_H
-#   include <config.h>
-#endif
-#ifdef HAVE_ENDIAN_H
-#   include <endian.h>
-#else
-#   ifdef HAVE_SYS_ENDIAN_H
-#       include <sys/endian.h>
-#   else
-#       error "Neither endian.h nor sys/endian.h found"
-#   endif
-#endif
 //#include <arpa/inet.h>
 #include <string.h>
 
