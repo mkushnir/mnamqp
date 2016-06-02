@@ -1,9 +1,6 @@
 AUTOMAKE_OPTIONS = foreign subdir-objects
 AM_MAKEFLAGS = -s
 
-distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/src
-dist_HEADERS =
-
 BUILT_SOURCES = diag.c diag.h
 EXTRA_DIST = diag.txt gen-diag
 CLEANFILES = $(BUILT_SOURCES) *.core

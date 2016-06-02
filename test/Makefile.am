@@ -4,14 +4,11 @@ AM_MAKEFLAGS = -s
 CLEANFILES = *.core
 #CLEANFILES += *.in
 
-noinst_PROGRAMS=testfoo testpubsub testrpc
+noinst_PROGRAMS = testfoo testpubsub testrpc
 
-distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/test
-dist_HEADERS = unittest.h ../src/mrkamqp.h
+noinst_HEADERS = unittest.h
 
 BUILT_SOURCES = ../src/diag.c ../src/diag.h
-
-noinst_HEADERS =
 
 if DEBUG
 DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
