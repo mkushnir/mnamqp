@@ -20,5 +20,5 @@ please see:
 - https://www.rabbitmq.com/how.html
 
 The library is based on asynchronous event-driven threading model
-_mrkthr_.
+[mrkthr](http://github.com/mkushnir/mrkthr).
 
