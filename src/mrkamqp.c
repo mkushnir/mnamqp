@@ -842,10 +842,13 @@ amqp_conn_run(amqp_conn_t *conn)
 
     conn->recv_thread = mrkthr_spawn("amqrecv", recv_thread_worker, 1, conn);
     mrkthr_set_prio(conn->recv_thread, 1);
+    mrkthr_incabac(conn->recv_thread);
     conn->send_thread = mrkthr_spawn("amqsend", send_thread_worker, 1, conn);
     mrkthr_set_prio(conn->send_thread, 1);
+    mrkthr_incabac(conn->send_thread);
     conn->heartbeat_thread = mrkthr_spawn("amqhrtb", heartbeat_thread_worker, 1, conn);
     mrkthr_set_prio(conn->heartbeat_thread, 1);
+    mrkthr_incabac(conn->heartbeat_thread);
 
     // >>> AMQP0091
     if (send_raw_octets(conn, (uint8_t *)greeting, sizeof(greeting)) != 0) {
@@ -1057,29 +1060,41 @@ amqp_conn_stop_threads(amqp_conn_t *conn)
     if (mrkthr_signal_has_owner(&conn->ping_sig)) {
         mrkthr_signal_error_and_join(&conn->ping_sig, MRKAMQP_STOP_THREADS);
     }
+
     if (mrkthr_signal_has_owner(&conn->oframe_sig)) {
         mrkthr_signal_error_and_join(&conn->oframe_sig, MRKAMQP_STOP_THREADS);
     }
+
     if (conn->heartbeat_thread != NULL) {
         int res;
+
+        mrkthr_decabac(conn->heartbeat_thread);
         if ((res = mrkthr_set_interrupt_and_join(conn->heartbeat_thread)) != 0) {
             //CTRACE("could not see send thread, error: %s", mrkthr_diag_str(res));
         }
         conn->heartbeat_thread = NULL;
     }
+
     if (conn->send_thread != NULL) {
         int res;
+
+        mrkthr_decabac(conn->send_thread);
         if ((res = mrkthr_set_interrupt_and_join(conn->send_thread)) != 0) {
             //CTRACE("could not see send thread, error: %s", mrkthr_diag_str(res));
         }
         conn->send_thread = NULL;
     }
+
     if (conn->recv_thread != NULL) {
         int res;
+
+        mrkthr_decabac(conn->recv_thread);
         if ((res = mrkthr_set_interrupt_and_join(conn->recv_thread)) != 0) {
             //CTRACE("could not see recv thread, error: %s", mrkthr_diag_str(res));
         }
+        conn->recv_thread = NULL;
     }
+
     (void)array_traverse(&conn->channels,
                          (array_traverser_t)channel_stop_threads_cb, NULL);
 }
