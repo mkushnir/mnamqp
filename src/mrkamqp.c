@@ -1016,7 +1016,7 @@ consumer_stop_threads_cb(UNUSED bytes_t *key,
     }
     if (cons->content_thread != NULL) {
         int res;
-        if ((res = mrkthr_join(cons->content_thread)) != 0) {
+        if ((res = mrkthr_set_interrupt_and_join(cons->content_thread)) != 0) {
             //CTRACE("could not see content thread");
         }
         cons->content_thread = NULL;
@@ -1752,6 +1752,18 @@ amqp_channel_qos(amqp_channel_t *chan,
 
 
 int
+amqp_channel_flow(amqp_channel_t *chan,
+                  uint8_t flags)
+{
+    AMQP_CHANNEL_METHOD_PAIR(channel_flow,
+                             AMQP_CHANNEL_FLOW_OK,
+                             AMQP_FLOW,
+        m->flags = flags;,
+    )
+}
+
+
+int
 amqp_channel_publish(amqp_channel_t *chan,
                      const char *exchange,
                      const char *routing_key,
@@ -2250,7 +2262,8 @@ content_thread_worker(UNUSED int argc, void **argv)
              * XXX content_cb ?
              */
 
-            if ((data = malloc(pc->header->payload.header->body_size)) == NULL) {
+            if ((data = malloc(
+                    pc->header->payload.header->body_size)) == NULL) {
                 FAIL("malloc");
             }
 
@@ -2287,14 +2300,26 @@ content_thread_worker(UNUSED int argc, void **argv)
 
             if (!(cons->flags & CONSUME_FNOACK)) {
                 amqp_frame_t *fr1;
-                amqp_basic_ack_t *m;
                 amqp_basic_deliver_t *d;
 
-                fr1 = amqp_frame_new(cons->chan->id, AMQP_FMETHOD);
-                m = NEWREF(basic_ack)();
-                d = (amqp_basic_deliver_t *)pc->method->payload.params;
-                m->delivery_tag = d->delivery_tag;
-                fr1->payload.params = (amqp_meth_params_t *)m;
+                if (res == MRKAMQP_CONSUME_NACK) {
+                    amqp_basic_nack_t *m;
+                    fr1 = amqp_frame_new(cons->chan->id, AMQP_FMETHOD);
+                    m = NEWREF(basic_nack)();
+                    d = (amqp_basic_deliver_t *)pc->method->payload.params;
+                    m->delivery_tag = d->delivery_tag;
+                    fr1->payload.params = (amqp_meth_params_t *)m;
+                    res = 0;
+
+                } else {
+                    amqp_basic_ack_t *m;
+                    fr1 = amqp_frame_new(cons->chan->id, AMQP_FMETHOD);
+                    m = NEWREF(basic_ack)();
+                    d = (amqp_basic_deliver_t *)pc->method->payload.params;
+                    m->delivery_tag = d->delivery_tag;
+                    fr1->payload.params = (amqp_meth_params_t *)m;
+                }
+
                 channel_send_frame(cons->chan, fr1);
                 fr1 = NULL;
             }

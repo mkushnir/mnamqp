@@ -258,6 +258,9 @@ MRKAMQP_SYNC int amqp_channel_qos(amqp_channel_t *,
                      uint16_t,
                      uint8_t);
 
+#define FLOW_ACTIVE                     0x01
+MRKAMQP_SYNC int amqp_channel_flow(amqp_channel_t *, uint8_t);
+
 #if 0 // see amqp_channel_create_consumer()
 #define CONSUME_FNOLOCAL                0x01
 #define CONSUME_FNOACK                  0x02
@@ -378,6 +381,7 @@ AMQP_HEADER_SET_DECL(cluster_id, bytes_t *);
 
 #define MRKAMQP_STOP_THREADS (-128)
 #define MRKAMQP_PROTOCOL_ERROR (-129)
+#define MRKAMQP_CONSUME_NACK (-130)
 /*
  * rpc
  */

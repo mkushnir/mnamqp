@@ -130,6 +130,7 @@ my_header_completion_cb(UNUSED amqp_channel_t *chan,
     header->delivery_mode = 2;
 }
 
+
 static int
 traversedir_cb(const char *dir, struct dirent *de, void *udata)
 {

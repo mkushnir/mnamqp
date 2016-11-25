@@ -758,6 +758,7 @@ NEWDECL(connection_open);
 NEWDECL(connection_close);
 NEWDECL(connection_close_ok);
 NEWDECL(channel_open);
+NEWDECL(channel_flow);
 NEWDECL(channel_close);
 NEWDECL(confirm_select);
 NEWDECL(exchange_declare);
@@ -774,6 +775,7 @@ NEWDECL(basic_cancel_ok);
 NEWDECL(basic_publish);
 NEWDECL(basic_deliver);
 NEWDECL(basic_ack);
+NEWDECL(basic_nack);
 
 
 /*
