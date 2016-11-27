@@ -93,7 +93,7 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
 
     CTRACE("Shutting down ...");
     shutting_down = true;
-    mrkthr_spawn("_shutdown", _shutdown, 0);
+    MRKTHR_SPAWN("_shutdown", _shutdown);
     return 0;
 }
 
@@ -101,7 +101,7 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
 static void
 myterm(UNUSED int sig)
 {
-    (void)mrkthr_spawn_sig("sigshutdown", sigshutdown, 0);
+    (void)MRKTHR_SPAWN_SIG("sigshutdown", sigshutdown);
 }
 
 
@@ -272,8 +272,8 @@ main(int argc, char **argv)
 
     mrkthr_init();
 
-    run_thread = mrkthr_spawn("run0", run0, 0);
-    monitor_thread = mrkthr_spawn("monitor", mymonitor, 0);
+    run_thread = MRKTHR_SPAWN("run0", run0);
+    monitor_thread = MRKTHR_SPAWN("monitor", mymonitor);
 
     mrkthr_loop();
     mrkthr_fini();

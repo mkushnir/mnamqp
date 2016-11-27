@@ -41,7 +41,7 @@ _shutdown(UNUSED int argc, UNUSED void **argv)
 static void
 myterm(UNUSED int sig)
 {
-    (void)mrkthr_spawn("shutdown_thread", _shutdown, 0);
+    (void)MRKTHR_SPAWN("shutdown_thread", _shutdown);
 }
 
 static int
@@ -182,7 +182,7 @@ run(UNUSED int argc, UNUSED void **argv)
         goto err;
     }
 
-    mrkthr_spawn("pub", mypub, 1, chan);
+    (void)MRKTHR_SPAWN("pub", mypub, chan);
 
     amqp_consumer_handle_content(cons, my_content_cb, NULL, NULL);
 
@@ -213,7 +213,7 @@ test1(void)
     mrkthr_init();
     mrkamqp_init();
 
-    mrkthr_spawn("run", run, 0);
+    (void)MRKTHR_SPAWN("run", run);
 
     mrkthr_loop();
 

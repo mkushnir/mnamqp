@@ -48,7 +48,7 @@ static long qsize = DEFAULT_QSIZE;
 static int myqos = 0;
 static int nconsumers = 1;
 
-static mygauge_t consumed;
+static mygauge_t consumed[128];
 static mygauge_t drained;
 
 typedef struct _mymessage {
@@ -121,7 +121,7 @@ myterm(UNUSED int sig)
 {
     CTRACE("Shutting down ...");
     shutting_down = true;
-    mrkthr_spawn_sig("_shutdown", _shutdown, 0);
+    MRKTHR_SPAWN_SIG("_shutdown", _shutdown);
 }
 
 
@@ -146,6 +146,10 @@ recalc_myqos(void)
 {
     int res;
     long diff;
+
+    if (qsize <= 0) {
+        return 0;
+    }
 
     diff = qsize - (long)STQUEUE_LENGTH(&qmsg);
 
@@ -172,11 +176,17 @@ UNUSED static int
 mymonitor(UNUSED int argc, UNUSED void **argv)
 {
     while (!shutting_down) {
+        int i;
+
         if (mrkthr_sleep(1000) != 0) {
             break;
         }
-        TRACEC("consumed:%ld drained:%ld qlen:%ld qos:%d\n",
-               mygauge_flush(&consumed),
+
+        TRACEC("consumed:");
+        for (i = 0; i < nconsumers; ++i) {
+            TRACEC("% 6ld", mygauge_flush(&consumed[i]));
+        }
+        TRACEC("\tdrained:%ld qlen:%ld qos:%d\n",
                mygauge_flush(&drained),
                STQUEUE_LENGTH(&qmsg),
                myqos);
@@ -198,12 +208,11 @@ mydrain(UNUSED int argc, UNUSED void **argv)
         if ((msg = STQUEUE_HEAD(&qmsg)) != NULL) {
             STQUEUE_DEQUEUE(&qmsg, link);
             STQUEUE_ENTRY_FINI(link, msg);
-            if (msg->data != NULL) {
-                free(msg->data);
-                msg->data = NULL;
-                free(msg);
-                mygauge_incr(&drained, 1);
-            }
+            assert(msg->data != NULL);
+            free(msg->data);
+            msg->data = NULL;
+            free(msg);
+            mygauge_incr(&drained, 1);
         } else {
             mrkthr_cond_signal_one(&mycond);
         }
@@ -243,13 +252,15 @@ static int
 mycb(UNUSED amqp_frame_t *method,
      UNUSED amqp_frame_t *header,
      char *data,
-     UNUSED void *udata)
+     void *udata)
 {
+    int i;
     int res;
 
+    i = (int)(intptr_t)udata;
     res = 0;
     if (data != NULL) {
-        if ((long)STQUEUE_LENGTH(&qmsg) > qsize) {
+        if ((qsize > 0) && ((long)STQUEUE_LENGTH(&qmsg) > qsize)) {
             /*
              * qmsg is over limit
              */
@@ -262,7 +273,40 @@ mycb(UNUSED amqp_frame_t *method,
         }
 
         mymessage_enqueue(data);
-        mygauge_incr(&consumed, 1);
+        mygauge_incr(&consumed[i], 1);
+    }
+
+    return res;
+
+}
+
+
+static int
+mycbnoq(UNUSED amqp_frame_t *method,
+        UNUSED amqp_frame_t *header,
+        char *data,
+        void *udata)
+{
+    int i;
+    int res;
+
+    i = (int)(intptr_t)udata;
+    res = 0;
+    if (data != NULL) {
+        if ((qsize > 0) && ((long)STQUEUE_LENGTH(&qmsg) > qsize)) {
+            /*
+             * qmsg is over limit
+             */
+            if (mrkthr_cond_wait(&mycond) != 0) {
+                TRACE("mrkthr_cond_wait");
+            }
+            //if (mrkthr_sleep(2000) != 0) {
+            //    return 1;
+            //}
+        }
+
+        free(data);
+        mygauge_incr(&consumed[i], 1);
     }
 
     return res;
@@ -288,7 +332,11 @@ runcons(UNUSED int argc, void **argv)
 
     CTRACE(">>> consumer %d", i);
 
-    (void)amqp_consumer_handle_content_spawn(cons, mycb, NULL, NULL);
+    if (qsize > 0) {
+        (void)amqp_consumer_handle_content_spawn(cons, mycb, NULL, argv[0]);
+    } else {
+        (void)amqp_consumer_handle_content_spawn(cons, mycbnoq, NULL, argv[0]);
+    }
 
 end:
     CTRACE("<<< consumer %d", i);
@@ -304,7 +352,6 @@ run0(UNUSED int argc, UNUSED void **argv)
 {
     int i;
 
-    mygauge_init(&consumed, 0);
     mygauge_init(&drained, 0);
 
     mrkthr_cond_init(&mycond);
@@ -324,8 +371,10 @@ run0(UNUSED int argc, UNUSED void **argv)
         goto err;
     }
 
-    if (amqp_channel_qos(g.chan, 0, myqos, 0) != 0) {
-        goto err;
+    if (qsize > 0) {
+        if (amqp_channel_qos(g.chan, 0, myqos, 0) != 0) {
+            goto err;
+        }
     }
 
     g.initialized = true;
@@ -333,7 +382,8 @@ run0(UNUSED int argc, UNUSED void **argv)
     for (i = 0; i < nconsumers; ++i) {
         mrkthr_ctx_t *thread;
 
-        thread = mrkthr_spawn(NULL, runcons, 1, (void *)(intptr_t)i);
+        mygauge_init(&consumed[i], 0);
+        thread = MRKTHR_SPAWN(NULL, runcons, (void *)(intptr_t)i);
         mrkthr_set_name(thread, "cons%d", i);
     }
 
@@ -440,9 +490,9 @@ main(int argc, char **argv)
 
     mrkthr_init();
 
-    run_thread = mrkthr_spawn("run0", run0, 0);
-    drain_thread = mrkthr_spawn("drain", mydrain, 0);
-    monitor_thread = mrkthr_spawn("monitor", mymonitor, 0);
+    run_thread = MRKTHR_SPAWN("run0", run0);
+    drain_thread = MRKTHR_SPAWN("drain", mydrain);
+    monitor_thread = MRKTHR_SPAWN("monitor", mymonitor);
 
     mrkthr_loop();
     mrkthr_fini();

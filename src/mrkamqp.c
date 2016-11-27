@@ -840,13 +840,13 @@ amqp_conn_run(amqp_conn_t *conn)
         goto err;
     }
 
-    conn->recv_thread = mrkthr_spawn("amqrecv", recv_thread_worker, 1, conn);
+    conn->recv_thread = MRKTHR_SPAWN("amqrecv", recv_thread_worker, conn);
     mrkthr_set_prio(conn->recv_thread, 1);
     mrkthr_incabac(conn->recv_thread);
-    conn->send_thread = mrkthr_spawn("amqsend", send_thread_worker, 1, conn);
+    conn->send_thread = MRKTHR_SPAWN("amqsend", send_thread_worker, conn);
     mrkthr_set_prio(conn->send_thread, 1);
     mrkthr_incabac(conn->send_thread);
-    conn->heartbeat_thread = mrkthr_spawn("amqhrtb", heartbeat_thread_worker, 1, conn);
+    conn->heartbeat_thread = MRKTHR_SPAWN("amqhrtb", heartbeat_thread_worker, conn);
     mrkthr_set_prio(conn->heartbeat_thread, 1);
     mrkthr_incabac(conn->heartbeat_thread);
 
@@ -2376,9 +2376,8 @@ amqp_consumer_handle_content_spawn(amqp_consumer_t *cons,
     cons->content_cb = ctcb;
     cons->cancel_cb = clcb;
     cons->content_udata = udata;
-    cons->content_thread = mrkthr_spawn((char *)BDATA(cons->consumer_tag),
+    cons->content_thread = MRKTHR_SPAWN((char *)BDATA(cons->consumer_tag),
                                         content_thread_worker,
-                                        1,
                                         cons);
     return mrkthr_join(cons->content_thread);
 

@@ -89,7 +89,7 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
 static void
 myterm(UNUSED int sig)
 {
-    (void)mrkthr_spawn("sigshutdown", sigshutdown, 0);
+    (void)MRKTHR_SPAWN("sigshutdown", sigshutdown);
 }
 
 
@@ -334,7 +334,7 @@ main(int argc, char **argv)
 
     mrkthr_init();
 
-    mrkthr_spawn("run0", run0, 0);
+    MRKTHR_SPAWN("run0", run0);
 
     mrkthr_loop();
 

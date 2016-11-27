@@ -453,7 +453,7 @@ amqp_rpc_run_spawn(amqp_rpc_t *rpc)
     assert(rpc->cons != NULL);
     assert(rpc->cccb != NULL);
     assert(rpc->clcb != NULL);
-    return mrkthr_spawn("amqrpc", amqp_rpc_run_spawn_worker, 1, rpc);
+    return MRKTHR_SPAWN("amqrpc", amqp_rpc_run_spawn_worker, rpc);
 }
 
 int
