@@ -42,5 +42,12 @@ testham_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lm
 ../src/diag.c ../src/diag.h: ../src/diag.txt
 	$(AM_V_GEN) /bin/sh ../gen-diag mrkamqp
 
+testham-run: testham
+	@if test -x $>; \
+	    then LD_LIBRARY_PATH=$(libdir) ./$> $${$(>)_ARGS}; \
+	    else true; \
+	fi
+
 testrun: all
-	for i in $(noinst_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;
+	for i in $(noinst_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i $${i}_ARGS; fi; done;
+

@@ -66,6 +66,8 @@ typedef struct _amqp_channel {
     mrkthr_signal_t expect_sig;
     mrkthr_sema_t sync_sema;
     hash_t consumers;
+    /* strong ref */
+    struct _amqp_consumer *default_consumer;
     /* weak ref */
     struct _amqp_consumer *content_consumer;
     uint64_t publish_tag;
@@ -185,6 +187,7 @@ amqp_conn_t *amqp_conn_new(const char *,
                            int,
                            short,
                            int);
+size_t amqp_conn_oframes_length(amqp_conn_t *);
 void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
 MRKAMQP_SYNC int amqp_conn_run(amqp_conn_t *);
@@ -198,6 +201,7 @@ void amqp_conn_post_close(amqp_conn_t *);
  * channel
  */
 MRKAMQP_SYNC amqp_channel_t *amqp_create_channel(amqp_conn_t *);
+size_t amqp_channel_iframes_length(amqp_channel_t *);
 #define CHANNEL_CONFIRM_FNOWAIT         0x01
 MRKAMQP_SYNC int amqp_channel_confirm(amqp_channel_t *, uint8_t);
 MRKAMQP_SYNC int amqp_close_channel(amqp_channel_t *);
@@ -314,6 +318,8 @@ MRKAMQP_SYNC amqp_consumer_t *amqp_channel_create_consumer(amqp_channel_t *,
                                                            const char *,
                                                            const char *,
                                                            uint8_t);
+
+amqp_consumer_t *amqp_channel_set_default_consumer(amqp_channel_t *);
 
 int amqp_consumer_handle_content_spawn(amqp_consumer_t *,
                                        amqp_consumer_content_cb_t,

@@ -230,7 +230,6 @@ amqp_rpc_setup_client_cb0(UNUSED amqp_channel_t *chan,
     m = (amqp_queue_declare_ok_t *)fr0->payload.params;
     rpc->reply_to = m->queue;
     m->queue = NULL;
-
 }
 
 
@@ -290,6 +289,7 @@ amqp_rpc_setup_client(amqp_rpc_t *rpc, amqp_channel_t *chan)
                                             DECLARE_EXCHANGE_FAUTODELETE,
                                           NULL,
                                           amqp_rpc_setup_client_cb0,
+                                          NULL,
                                           rpc) != 0) {
             res = AMQP_RPC_SETUP_CLIENT + 1;
             goto err;

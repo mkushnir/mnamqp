@@ -298,6 +298,7 @@ run_conn(int argc, char **argv)
                                       DECLARE_QUEUE_FEXCLUSIVE,
                                       declare_queue_cb1,
                                       NULL,
+                                      NULL,
                                       NULL) != 0) {
         res = 1;
         goto err;

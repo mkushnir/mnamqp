@@ -169,6 +169,7 @@ run(UNUSED int argc, UNUSED void **argv)
                                       DECLARE_QUEUE_FEXCLUSIVE,
                                       declare_queue_cb1,
                                       NULL,
+                                      NULL,
                                       NULL) != 0) {
         res = 1;
         goto err;
