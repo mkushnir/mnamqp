@@ -353,7 +353,7 @@ mydqcb0(UNUSED amqp_channel_t *chan,
         void *udata)
 {
     struct {
-        bytes_t *qname;
+        mnbytes_t *qname;
     } *params = udata;
     amqp_queue_declare_ok_t *mparams;
 
@@ -404,7 +404,7 @@ runcons(UNUSED int argc, void **argv)
     int i;
     amqp_consumer_t *cons;
     struct {
-        bytes_t *qname;
+        mnbytes_t *qname;
     } params = { NULL };
 
     assert(argc == 1);

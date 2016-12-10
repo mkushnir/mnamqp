@@ -86,8 +86,8 @@ struct _amqp_rpc;
 struct _amqp_meth_params;
 struct _amqp_header;
 
-typedef void (*amqp_encode)(struct _amqp_value *, bytestream_t *);
-typedef ssize_t (*amqp_decode)(struct _amqp_value *, bytestream_t *, int);
+typedef void (*amqp_encode)(struct _amqp_value *, mnbytestream_t *);
+typedef ssize_t (*amqp_decode)(struct _amqp_value *, mnbytestream_t *, int);
 typedef void (*amqp_kill)(struct _amqp_value *);
 
 typedef struct _amqp_type {
@@ -117,9 +117,9 @@ typedef struct _amqp_value {
         float f;
         double d;
         amqp_decimal_t dc;
-        bytes_t *str;
-        array_t a;
-        hash_t t;
+        mnbytes_t *str;
+        mnarray_t a;
+        mnhash_t t;
     } value;
 } amqp_value_t;
 
@@ -229,7 +229,7 @@ typedef struct _amqp_frame {
 typedef struct _amqp_meth_params_t *(*amqp_method_new_t)(void);
 
 typedef void (*amqp_method_str_t)(struct _amqp_meth_params *,
-                                  bytestream_t *);
+                                  mnbytestream_t *);
 
 typedef int (*amqp_method_enc_t) (struct _amqp_meth_params *,
                                   struct _amqp_conn *);
@@ -272,27 +272,27 @@ void amqp_##mname##_fini(amqp_meth_params_t *);                        \
 MPARAMS(connection_start,
     uint8_t version_major;
     uint8_t version_minor;
-    hash_t server_properties;
-    bytes_t *mechanisms;
-    bytes_t *locales;
+    mnhash_t server_properties;
+    mnbytes_t *mechanisms;
+    mnbytes_t *locales;
 )
 
 
 MPARAMS(connection_start_ok,
-    hash_t client_properties;
-    bytes_t *mechanism;
-    bytes_t *response;
-    bytes_t *locale;
+    mnhash_t client_properties;
+    mnbytes_t *mechanism;
+    mnbytes_t *response;
+    mnbytes_t *locale;
 )
 
 
 MPARAMS(connection_secure,
-    bytes_t *challenge;
+    mnbytes_t *challenge;
 )
 
 
 MPARAMS(connection_secure_ok,
-    bytes_t *response;
+    mnbytes_t *response;
 )
 
 
@@ -311,21 +311,21 @@ MPARAMS(connection_tune_ok,
 
 
 MPARAMS(connection_open,
-    bytes_t *virtual_host;
-    bytes_t *capabilities;
+    mnbytes_t *virtual_host;
+    mnbytes_t *capabilities;
     /* 0 insist */
     uint8_t flags;
 )
 
 
 MPARAMS(connection_open_ok,
-    bytes_t *known_hosts;
+    mnbytes_t *known_hosts;
 )
 
 
 MPARAMS(connection_close,
     uint16_t reply_code;
-    bytes_t *reply_text;
+    mnbytes_t *reply_text;
     uint16_t class_id;
     uint16_t method_id;
 )
@@ -339,7 +339,7 @@ MPARAMS(connection_close_ok,
  * channel.*
  */
 MPARAMS(channel_open,
-    bytes_t *out_of_band;
+    mnbytes_t *out_of_band;
 )
 
 
@@ -363,7 +363,7 @@ MPARAMS(channel_flow_ok,
 
 MPARAMS(channel_close,
     uint16_t reply_code;
-    bytes_t *reply_text;
+    mnbytes_t *reply_text;
     uint16_t class_id;
     uint16_t method_id;
 )
@@ -395,8 +395,8 @@ MPARAMS(confirm_select_ok,
  */
 MPARAMS(exchange_declare,
     uint16_t ticket;
-    bytes_t *exchange;
-    bytes_t *type;
+    mnbytes_t *exchange;
+    mnbytes_t *type;
     /*
      * 0 passive
      * 1 durable
@@ -405,7 +405,7 @@ MPARAMS(exchange_declare,
      * 4 nowait
      */
     uint8_t flags;
-    hash_t arguments;
+    mnhash_t arguments;
 )
 
 
@@ -415,7 +415,7 @@ MPARAMS(exchange_declare_ok,
 
 MPARAMS(exchange_delete,
     uint16_t ticket;
-    bytes_t *exchange;
+    mnbytes_t *exchange;
     /*
      * 0 if_unused
      * 1 nowait
@@ -435,7 +435,7 @@ MPARAMS(exchange_delete_ok,
  */
 MPARAMS(queue_declare,
     uint16_t ticket;
-    bytes_t *queue;
+    mnbytes_t *queue;
     /*
      * 0 passive
      * 1 durable
@@ -444,12 +444,12 @@ MPARAMS(queue_declare,
      * 4 nowait
      */
     uint8_t flags;
-    hash_t arguments;
+    mnhash_t arguments;
 )
 
 
 MPARAMS(queue_declare_ok,
-    bytes_t *queue;
+    mnbytes_t *queue;
     uint32_t message_count;
     uint32_t consumer_count;
 )
@@ -457,14 +457,14 @@ MPARAMS(queue_declare_ok,
 
 MPARAMS(queue_bind,
     uint16_t ticket;
-    bytes_t *queue;
-    bytes_t *exchange;
-    bytes_t *routing_key;
+    mnbytes_t *queue;
+    mnbytes_t *exchange;
+    mnbytes_t *routing_key;
     /*
      * 0 nowait
      */
     uint8_t flags;
-    hash_t arguments;
+    mnhash_t arguments;
 )
 
 
@@ -474,7 +474,7 @@ MPARAMS(queue_bind_ok,
 
 MPARAMS(queue_purge,
     uint16_t ticket;
-    bytes_t *queue;
+    mnbytes_t *queue;
     /*
      * 0 nowait
      */
@@ -489,7 +489,7 @@ MPARAMS(queue_purge_ok,
 
 MPARAMS(queue_delete,
     uint16_t ticket;
-    bytes_t *queue;
+    mnbytes_t *queue;
     /*
      * 0 if_unused
      * 1 if_empty
@@ -506,10 +506,10 @@ MPARAMS(queue_delete_ok,
 
 MPARAMS(queue_unbind,
     uint16_t ticket;
-    bytes_t *queue;
-    bytes_t *exchange;
-    bytes_t *routing_key;
-    hash_t arguments;
+    mnbytes_t *queue;
+    mnbytes_t *exchange;
+    mnbytes_t *routing_key;
+    mnhash_t arguments;
 )
 
 
@@ -536,8 +536,8 @@ MPARAMS(basic_qos_ok,
 
 MPARAMS(basic_consume,
     uint16_t ticket;
-    bytes_t *queue;
-    bytes_t *consumer_tag;
+    mnbytes_t *queue;
+    mnbytes_t *consumer_tag;
     /*
      * 0 no_local
      * 1 no_ack
@@ -545,17 +545,17 @@ MPARAMS(basic_consume,
      * 3 nowait
      */
     uint8_t flags;
-    hash_t arguments;
+    mnhash_t arguments;
 )
 
 
 MPARAMS(basic_consume_ok,
-    bytes_t *consumer_tag;
+    mnbytes_t *consumer_tag;
 )
 
 
 MPARAMS(basic_cancel,
-    bytes_t *consumer_tag;
+    mnbytes_t *consumer_tag;
     /*
      * 0 nowait
      */
@@ -564,14 +564,14 @@ MPARAMS(basic_cancel,
 
 
 MPARAMS(basic_cancel_ok,
-    bytes_t *consumer_tag;
+    mnbytes_t *consumer_tag;
 )
 
 
 MPARAMS(basic_publish,
     uint16_t ticket;
-    bytes_t *exchange;
-    bytes_t *routing_key;
+    mnbytes_t *exchange;
+    mnbytes_t *routing_key;
     /*
      * 0 mandatory
      * 1 immediate
@@ -582,27 +582,27 @@ MPARAMS(basic_publish,
 
 MPARAMS(basic_return,
     uint16_t reply_code;
-    bytes_t *reply_text;
-    bytes_t *exchange;
-    bytes_t *routing_key;
+    mnbytes_t *reply_text;
+    mnbytes_t *exchange;
+    mnbytes_t *routing_key;
 )
 
 
 MPARAMS(basic_deliver,
-    bytes_t *consumer_tag;
+    mnbytes_t *consumer_tag;
     uint64_t delivery_tag;
     /*
      * 0 redelivered
      */
     uint8_t flags;
-    bytes_t *exchange;
-    bytes_t *routing_key;
+    mnbytes_t *exchange;
+    mnbytes_t *routing_key;
 )
 
 
 MPARAMS(basic_get,
     uint16_t ticket;
-    bytes_t *queue;
+    mnbytes_t *queue;
     /*
      * 0 no_ack
      */
@@ -616,14 +616,14 @@ MPARAMS(basic_get_ok,
      * 0 redelivered
      */
     uint8_t flags;
-    bytes_t *exchange;
-    bytes_t *routing_key;
+    mnbytes_t *exchange;
+    mnbytes_t *routing_key;
     uint32_t message_count;
 )
 
 
 MPARAMS(basic_get_empty,
-    bytes_t *cluster_id;
+    mnbytes_t *cluster_id;
 )
 
 
@@ -680,33 +680,33 @@ MPARAMS(basic_nack,
 #define UNPACK_ECONSUME (-2)
 #define UNPACK_ETAG (-3)
 
-void pack_octet(bytestream_t *, uint8_t);
-ssize_t unpack_octet(bytestream_t *, int, uint8_t *);
-void pack_short(bytestream_t *, uint16_t);
-ssize_t unpack_short(bytestream_t *, int, uint16_t *);
-void pack_long(bytestream_t *, uint32_t);
-ssize_t unpack_long(bytestream_t *, int, uint32_t *);
-void pack_longlong(bytestream_t *, uint64_t);
-ssize_t unpack_longlong(bytestream_t *, int, uint64_t *v);
-void pack_float(bytestream_t *, float);
-ssize_t unpack_float(bytestream_t *, int, float *);
-void pack_double(bytestream_t *, double);
-ssize_t unpack_double(bytestream_t *, int, double *);
-void pack_shortstr(bytestream_t *, bytes_t *);
-ssize_t unpack_shortstr(bytestream_t *, int, bytes_t **);
-void pack_longstr(bytestream_t *, bytes_t *);
-ssize_t unpack_longstr(bytestream_t *, int, bytes_t **);
-void pack_table(bytestream_t *, hash_t *);
-ssize_t unpack_table(bytestream_t *, int, hash_t *);
-void init_table(hash_t *);
+void pack_octet(mnbytestream_t *, uint8_t);
+ssize_t unpack_octet(mnbytestream_t *, int, uint8_t *);
+void pack_short(mnbytestream_t *, uint16_t);
+ssize_t unpack_short(mnbytestream_t *, int, uint16_t *);
+void pack_long(mnbytestream_t *, uint32_t);
+ssize_t unpack_long(mnbytestream_t *, int, uint32_t *);
+void pack_longlong(mnbytestream_t *, uint64_t);
+ssize_t unpack_longlong(mnbytestream_t *, int, uint64_t *v);
+void pack_float(mnbytestream_t *, float);
+ssize_t unpack_float(mnbytestream_t *, int, float *);
+void pack_double(mnbytestream_t *, double);
+ssize_t unpack_double(mnbytestream_t *, int, double *);
+void pack_shortstr(mnbytestream_t *, mnbytes_t *);
+ssize_t unpack_shortstr(mnbytestream_t *, int, mnbytes_t **);
+void pack_longstr(mnbytestream_t *, mnbytes_t *);
+ssize_t unpack_longstr(mnbytestream_t *, int, mnbytes_t **);
+void pack_table(mnbytestream_t *, mnhash_t *);
+ssize_t unpack_table(mnbytestream_t *, int, mnhash_t *);
+void init_table(mnhash_t *);
 
-int amqp_decode_table(bytestream_t *, int, amqp_value_t **);
+int amqp_decode_table(mnbytestream_t *, int, amqp_value_t **);
 amqp_value_t *amqp_value_new(uint8_t);
 void amqp_value_destroy(amqp_value_t **);
 
 
 #define TABLE_ADD_REF(n, ty_)                          \
-int table_add_##n(hash_t *v, const char *key, ty_ val) \
+int table_add_##n(mnhash_t *v, const char *key, ty_ val) \
 
 
 TABLE_ADD_REF(boolean, char);
@@ -721,13 +721,13 @@ TABLE_ADD_REF(u64, uint64_t);
 TABLE_ADD_REF(float, float);
 TABLE_ADD_REF(double, double);
 // RabbitMQ doesn't like short str?
-//TABLE_ADD_REF(sstr, bytes_t *);
-TABLE_ADD_REF(lstr, bytes_t *);
-int table_add_value(hash_t *, const char *, amqp_value_t *);
-void table_str(hash_t *, bytestream_t *);
+//TABLE_ADD_REF(sstr, mnbytes_t *);
+TABLE_ADD_REF(lstr, mnbytes_t *);
+int table_add_value(mnhash_t *, const char *, amqp_value_t *);
+void table_str(mnhash_t *, mnbytestream_t *);
 
 
-amqp_value_t *table_get_value(hash_t *, bytes_t *);
+amqp_value_t *table_get_value(mnhash_t *, mnbytes_t *);
 
 /*
  * frame API

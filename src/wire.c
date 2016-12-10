@@ -35,14 +35,14 @@ static amqp_type_t field_types[256];
  * octet
  */
 void
-pack_octet(bytestream_t *bs, uint8_t v)
+pack_octet(mnbytestream_t *bs, uint8_t v)
 {
     (void)bytestream_cat(bs, sizeof(uint8_t), (char *)&v);
 }
 
 
 ssize_t
-unpack_octet(bytestream_t *bs, int fd, uint8_t *v)
+unpack_octet(mnbytestream_t *bs, int fd, uint8_t *v)
 {
     while (SAVAIL(bs) < (ssize_t)sizeof(uint8_t)) {
         if (bytestream_consume_data(bs, fd) != 0) {
@@ -59,7 +59,7 @@ unpack_octet(bytestream_t *bs, int fd, uint8_t *v)
  * short
  */
 void
-pack_short(bytestream_t *bs, uint16_t v)
+pack_short(mnbytestream_t *bs, uint16_t v)
 {
     union {
         uint16_t i;
@@ -72,7 +72,7 @@ pack_short(bytestream_t *bs, uint16_t v)
 
 
 ssize_t
-unpack_short(bytestream_t *bs, int fd, uint16_t *v)
+unpack_short(mnbytestream_t *bs, int fd, uint16_t *v)
 {
     union {
         char *c;
@@ -95,7 +95,7 @@ unpack_short(bytestream_t *bs, int fd, uint16_t *v)
  * long
  */
 void
-pack_long(bytestream_t *bs, uint32_t v)
+pack_long(mnbytestream_t *bs, uint32_t v)
 {
     union {
         uint32_t i;
@@ -108,7 +108,7 @@ pack_long(bytestream_t *bs, uint32_t v)
 
 
 ssize_t
-unpack_long(bytestream_t *bs, int fd, uint32_t *v)
+unpack_long(mnbytestream_t *bs, int fd, uint32_t *v)
 {
     union {
         char *c;
@@ -131,7 +131,7 @@ unpack_long(bytestream_t *bs, int fd, uint32_t *v)
  * longlong
  */
 void
-pack_longlong(bytestream_t *bs, uint64_t v)
+pack_longlong(mnbytestream_t *bs, uint64_t v)
 {
     union {
         uint64_t i;
@@ -144,7 +144,7 @@ pack_longlong(bytestream_t *bs, uint64_t v)
 
 
 ssize_t
-unpack_longlong(bytestream_t *bs, int fd, uint64_t *v)
+unpack_longlong(mnbytestream_t *bs, int fd, uint64_t *v)
 {
     union {
         char *c;
@@ -167,7 +167,7 @@ unpack_longlong(bytestream_t *bs, int fd, uint64_t *v)
  * float
  */
 void
-pack_float(bytestream_t *bs, float v)
+pack_float(mnbytestream_t *bs, float v)
 {
     union {
         float f;
@@ -180,7 +180,7 @@ pack_float(bytestream_t *bs, float v)
 
 
 ssize_t
-unpack_float(bytestream_t *bs, int fd, float *v)
+unpack_float(mnbytestream_t *bs, int fd, float *v)
 {
     union {
         char *c;
@@ -203,7 +203,7 @@ unpack_float(bytestream_t *bs, int fd, float *v)
  * double
  */
 void
-pack_double(bytestream_t *bs, double v)
+pack_double(mnbytestream_t *bs, double v)
 {
     union {
         double d;
@@ -216,7 +216,7 @@ pack_double(bytestream_t *bs, double v)
 
 
 ssize_t
-unpack_double(bytestream_t *bs, int fd, double *v)
+unpack_double(mnbytestream_t *bs, int fd, double *v)
 {
     union {
         char *c;
@@ -239,7 +239,7 @@ unpack_double(bytestream_t *bs, int fd, double *v)
  * shortstr
  */
 void
-pack_shortstr(bytestream_t *bs, bytes_t *s)
+pack_shortstr(mnbytestream_t *bs, mnbytes_t *s)
 {
     union {
         uint8_t sz;
@@ -256,7 +256,7 @@ pack_shortstr(bytestream_t *bs, bytes_t *s)
 
 
 ssize_t
-unpack_shortstr(bytestream_t *bs, int fd, bytes_t **v)
+unpack_shortstr(mnbytestream_t *bs, int fd, mnbytes_t **v)
 {
     uint8_t sz;
 
@@ -287,7 +287,7 @@ unpack_shortstr(bytestream_t *bs, int fd, bytes_t **v)
  * longstr
  */
 void
-pack_longstr(bytestream_t *bs, bytes_t *s)
+pack_longstr(mnbytestream_t *bs, mnbytes_t *s)
 {
     union {
         uint32_t sz;
@@ -304,7 +304,7 @@ pack_longstr(bytestream_t *bs, bytes_t *s)
 
 
 ssize_t
-unpack_longstr(bytestream_t *bs, int fd, bytes_t **v)
+unpack_longstr(mnbytestream_t *bs, int fd, mnbytes_t **v)
 {
     uint32_t sz;
 
@@ -336,7 +336,7 @@ unpack_longstr(bytestream_t *bs, int fd, bytes_t **v)
  * field value
  */
 static void
-pack_field_value(bytestream_t *bs, amqp_value_t *v)
+pack_field_value(mnbytestream_t *bs, amqp_value_t *v)
 {
     pack_octet(bs, v->ty->tag);
     v->ty->enc(v, bs);
@@ -344,7 +344,7 @@ pack_field_value(bytestream_t *bs, amqp_value_t *v)
 
 
 static ssize_t
-unpack_field_value(bytestream_t *bs, int fd, amqp_value_t **v)
+unpack_field_value(mnbytestream_t *bs, int fd, amqp_value_t **v)
 {
     amqp_type_t *ty;
     ssize_t res0, res1;
@@ -380,7 +380,7 @@ unpack_field_value(bytestream_t *bs, int fd, amqp_value_t **v)
  * table
  */
 static int
-table_item_fini(bytes_t *key, amqp_value_t *value)
+table_item_fini(mnbytes_t *key, amqp_value_t *value)
 {
     BYTES_DECREF(&key);
     amqp_value_destroy(&value);
@@ -388,12 +388,12 @@ table_item_fini(bytes_t *key, amqp_value_t *value)
 }
 
 static int
-pack_table_cb( bytes_t *key,
+pack_table_cb( mnbytes_t *key,
               amqp_value_t *value,
               void *udata)
 {
     struct {
-        bytestream_t *bs;
+        mnbytestream_t *bs;
     } *params = udata;
 
     pack_shortstr(params->bs, key);
@@ -403,10 +403,10 @@ pack_table_cb( bytes_t *key,
 
 
 void
-pack_table(bytestream_t *bs, hash_t *v)
+pack_table(mnbytestream_t *bs, mnhash_t *v)
 {
     struct {
-        bytestream_t *bs;
+        mnbytestream_t *bs;
     } params;
     off_t seod0, seod1;
     union {
@@ -427,7 +427,7 @@ pack_table(bytestream_t *bs, hash_t *v)
 
 
 void
-init_table(hash_t *v)
+init_table(mnhash_t *v)
 {
     hash_init(v, 17,
              (hash_hashfn_t)bytes_hash,
@@ -440,7 +440,7 @@ init_table(hash_t *v)
 #define TABLE_ADD_DEF(n, ty_, tag, vname)                      \
 TABLE_ADD_REF(n, ty_)                                          \
 {                                                              \
-    bytes_t *k;                                                \
+    mnbytes_t *k;                                                \
     k = bytes_new_from_str(key);                               \
     if (hash_get_item(v, k) != NULL) {                         \
         BYTES_DECREF(&k);                                      \
@@ -476,14 +476,14 @@ TABLE_ADD_DEF(u64, uint64_t, AMQP_TUINT64, u64)
 TABLE_ADD_DEF(float, float, AMQP_TFLOAT, f)
 TABLE_ADD_DEF(double, double, AMQP_TDOUBLE, d)
 // RabbitMQ doesn't like short str?
-//TABLE_ADD_DEF(sstr, bytes_t *, AMQP_TSSTR, str)
-TABLE_ADD_DEF(lstr, bytes_t *, AMQP_TLSTR, str)
+//TABLE_ADD_DEF(sstr, mnbytes_t *, AMQP_TSSTR, str)
+TABLE_ADD_DEF(lstr, mnbytes_t *, AMQP_TLSTR, str)
 
 
 int
-table_add_value(hash_t *v, const char *key, amqp_value_t *val)
+table_add_value(mnhash_t *v, const char *key, amqp_value_t *val)
 {
-    bytes_t *k;
+    mnbytes_t *k;
 
     k = bytes_new_from_str(key);
 
@@ -498,9 +498,9 @@ table_add_value(hash_t *v, const char *key, amqp_value_t *val)
 
 
 amqp_value_t *
-table_get_value(hash_t *v, bytes_t *key)
+table_get_value(mnhash_t *v, mnbytes_t *key)
 {
-    hash_item_t *hit;
+    mnhash_item_t *hit;
 
     if ((hit = hash_get_item(v, key)) == NULL) {
         return NULL;
@@ -510,7 +510,7 @@ table_get_value(hash_t *v, bytes_t *key)
 
 
 static int
-table_str_cb(bytes_t *key, amqp_value_t *val, bytestream_t *bs)
+table_str_cb(mnbytes_t *key, amqp_value_t *val, mnbytestream_t *bs)
 {
     bytestream_nprintf(bs, 1024, "%s=", BDATA(key));
     switch (val->ty->tag) {
@@ -584,7 +584,7 @@ table_str_cb(bytes_t *key, amqp_value_t *val, bytestream_t *bs)
 }
 
 void
-table_str(hash_t *v, bytestream_t *bs)
+table_str(mnhash_t *v, mnbytestream_t *bs)
 {
     off_t eod;
 
@@ -599,7 +599,7 @@ table_str(hash_t *v, bytestream_t *bs)
 
 
 ssize_t
-unpack_table(bytestream_t *bs, int fd, hash_t *v)
+unpack_table(mnbytestream_t *bs, int fd, mnhash_t *v)
 {
     uint32_t sz;
     ssize_t nread;
@@ -611,7 +611,7 @@ unpack_table(bytestream_t *bs, int fd, hash_t *v)
     nread = 0;
     while (nread < sz) {
         ssize_t n;
-        bytes_t *key;
+        mnbytes_t *key;
         amqp_value_t *value;
 
         key = NULL;
@@ -652,7 +652,7 @@ unpack_table(bytestream_t *bs, int fd, hash_t *v)
 static int
 pack_array_cb(amqp_value_t **v, void *udata)
 {
-    bytestream_t *bs;
+    mnbytestream_t *bs;
 
     bs = udata;
     assert(*v != NULL);
@@ -661,7 +661,7 @@ pack_array_cb(amqp_value_t **v, void *udata)
 }
 
 void
-pack_array(bytestream_t *bs, array_t *v)
+pack_array(mnbytestream_t *bs, mnarray_t *v)
 {
     pack_long(bs, (uint32_t)v->elnum);
     array_traverse(v, (array_traverser_t)pack_array_cb, bs);
@@ -677,7 +677,7 @@ array_item_fini(amqp_value_t **v)
 
 
 ssize_t
-unpack_array(bytestream_t *bs, int fd, array_t *v)
+unpack_array(mnbytestream_t *bs, int fd, mnarray_t *v)
 {
     uint32_t elnum, i;
     ssize_t nread;
@@ -717,14 +717,14 @@ unpack_array(bytestream_t *bs, int fd, array_t *v)
  * boolean
  */
 static void
-enc_bool(amqp_value_t *v, bytestream_t *bs)
+enc_bool(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_octet(bs, v->value.b);
 }
 
 
 static ssize_t
-dec_bool(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_bool(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_octet(bs, fd, (uint8_t *)&v->value.b);
 }
@@ -734,14 +734,14 @@ dec_bool(amqp_value_t *v, bytestream_t *bs, int fd)
  * int8
  */
 static void
-enc_int8(amqp_value_t *v, bytestream_t *bs)
+enc_int8(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_octet(bs, v->value.i8);
 }
 
 
 static ssize_t
-dec_int8(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_int8(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_octet(bs, fd, (uint8_t *)&v->value.i8);
 }
@@ -751,14 +751,14 @@ dec_int8(amqp_value_t *v, bytestream_t *bs, int fd)
  * uint8
  */
 static void
-enc_uint8(amqp_value_t *v, bytestream_t *bs)
+enc_uint8(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_octet(bs, v->value.u8);
 }
 
 
 static ssize_t
-dec_uint8(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_uint8(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_octet(bs, fd, &v->value.u8);
 }
@@ -768,14 +768,14 @@ dec_uint8(amqp_value_t *v, bytestream_t *bs, int fd)
  * int16
  */
 static void
-enc_int16(amqp_value_t *v, bytestream_t *bs)
+enc_int16(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_short(bs, v->value.i16);
 }
 
 
 static ssize_t
-dec_int16(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_int16(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_short(bs, fd, (uint16_t *)&v->value.i16);
 }
@@ -785,14 +785,14 @@ dec_int16(amqp_value_t *v, bytestream_t *bs, int fd)
  * uint16
  */
 static void
-enc_uint16(amqp_value_t *v, bytestream_t *bs)
+enc_uint16(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_short(bs, v->value.u16);
 }
 
 
 static ssize_t
-dec_uint16(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_uint16(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_short(bs, fd, &v->value.u16);
 }
@@ -802,14 +802,14 @@ dec_uint16(amqp_value_t *v, bytestream_t *bs, int fd)
  * int32
  */
 static void
-enc_int32(amqp_value_t *v, bytestream_t *bs)
+enc_int32(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_long(bs, v->value.i32);
 }
 
 
 static ssize_t
-dec_int32(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_int32(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_long(bs, fd, (uint32_t *)&v->value.i32);
 }
@@ -819,14 +819,14 @@ dec_int32(amqp_value_t *v, bytestream_t *bs, int fd)
  * uint32
  */
 static void
-enc_uint32(amqp_value_t *v, bytestream_t *bs)
+enc_uint32(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_long(bs, v->value.u32);
 }
 
 
 static ssize_t
-dec_uint32(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_uint32(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_long(bs, fd, &v->value.u32);
 }
@@ -836,14 +836,14 @@ dec_uint32(amqp_value_t *v, bytestream_t *bs, int fd)
  * int64
  */
 static void
-enc_int64(amqp_value_t *v, bytestream_t *bs)
+enc_int64(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_longlong(bs, v->value.i64);
 }
 
 
 static ssize_t
-dec_int64(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_int64(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_longlong(bs, fd, (uint64_t *)&v->value.i64);
 }
@@ -853,14 +853,14 @@ dec_int64(amqp_value_t *v, bytestream_t *bs, int fd)
  * uint64
  */
 static void
-enc_uint64(amqp_value_t *v, bytestream_t *bs)
+enc_uint64(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_longlong(bs, v->value.u64);
 }
 
 
 static ssize_t
-dec_uint64(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_uint64(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_longlong(bs, fd, &v->value.u64);
 }
@@ -870,14 +870,14 @@ dec_uint64(amqp_value_t *v, bytestream_t *bs, int fd)
  * float
  */
 static void
-enc_float(amqp_value_t *v, bytestream_t *bs)
+enc_float(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_float(bs, v->value.f);
 }
 
 
 static ssize_t
-dec_float(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_float(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_float(bs, fd, &v->value.f);
 }
@@ -887,14 +887,14 @@ dec_float(amqp_value_t *v, bytestream_t *bs, int fd)
  * double
  */
 static void
-enc_double(amqp_value_t *v, bytestream_t *bs)
+enc_double(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_double(bs, v->value.f);
 }
 
 
 static ssize_t
-dec_double(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_double(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_double(bs, fd, &v->value.d);
 }
@@ -904,7 +904,7 @@ dec_double(amqp_value_t *v, bytestream_t *bs, int fd)
  * decimal
  */
 static void
-enc_decimal(amqp_value_t *v, bytestream_t *bs)
+enc_decimal(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_octet(bs, v->value.dc.places);
     pack_long(bs, v->value.dc.value);
@@ -912,7 +912,7 @@ enc_decimal(amqp_value_t *v, bytestream_t *bs)
 
 
 static ssize_t
-dec_decimal(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_decimal(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     ssize_t res0, res1;
 
@@ -931,14 +931,14 @@ dec_decimal(amqp_value_t *v, bytestream_t *bs, int fd)
  * sstr
  */
 static void
-enc_sstr(amqp_value_t *v, bytestream_t *bs)
+enc_sstr(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_shortstr(bs, v->value.str);
 }
 
 
 static ssize_t
-dec_sstr(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_sstr(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_shortstr(bs, fd, &v->value.str);
 }
@@ -948,14 +948,14 @@ dec_sstr(amqp_value_t *v, bytestream_t *bs, int fd)
  * lstr
  */
 static void
-enc_lstr(amqp_value_t *v, bytestream_t *bs)
+enc_lstr(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_longstr(bs, v->value.str);
 }
 
 
 static ssize_t
-dec_lstr(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_lstr(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_longstr(bs, fd, &v->value.str);
 }
@@ -972,13 +972,13 @@ kill_str(amqp_value_t *v)
  * array
  */
 static void
-enc_array(UNUSED amqp_value_t *v, UNUSED bytestream_t *bs)
+enc_array(UNUSED amqp_value_t *v, UNUSED mnbytestream_t *bs)
 {
 }
 
 
 static ssize_t
-dec_array(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_array(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     return unpack_array(bs, fd, &v->value.a);
 }
@@ -995,14 +995,14 @@ kill_array(amqp_value_t *v)
  * table
  */
 static void
-enc_table(amqp_value_t *v, bytestream_t *bs)
+enc_table(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_table(bs, &v->value.t);
 }
 
 
 static ssize_t
-dec_table(amqp_value_t *v, bytestream_t *bs, int fd)
+dec_table(amqp_value_t *v, mnbytestream_t *bs, int fd)
 {
     init_table(&v->value.t);
     return unpack_table(bs, fd, &v->value.t);
@@ -1020,14 +1020,14 @@ kill_table(amqp_value_t *v)
  * void
  */
 static void
-enc_void(amqp_value_t *v, bytestream_t *bs)
+enc_void(amqp_value_t *v, mnbytestream_t *bs)
 {
     pack_octet(bs, v->ty->tag);
 }
 
 
 static ssize_t
-dec_void(UNUSED amqp_value_t *v, UNUSED bytestream_t *bs, UNUSED int fd)
+dec_void(UNUSED amqp_value_t *v, UNUSED mnbytestream_t *bs, UNUSED int fd)
 {
     return 0;
 }

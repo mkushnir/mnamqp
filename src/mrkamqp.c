@@ -37,7 +37,7 @@ static int channel_expect_method(amqp_channel_t *,
 static void channel_send_frame(amqp_channel_t *, amqp_frame_t *);
 static amqp_consumer_t *amqp_consumer_new(amqp_channel_t *, uint8_t);
 static void amqp_consumer_destroy(amqp_consumer_t **);
-static int amqp_consumer_item_fini(bytes_t *, amqp_consumer_t *);
+static int amqp_consumer_item_fini(mnbytes_t *, amqp_consumer_t *);
 static amqp_pending_content_t *amqp_pending_content_new(void);
 
 amqp_conn_t *
@@ -365,7 +365,7 @@ next_frame(amqp_conn_t *conn)
              */
             if (fr->payload.params->mi->mid == AMQP_BASIC_DELIVER) {
                 amqp_basic_deliver_t *m;
-                hash_item_t *dit;
+                mnhash_item_t *dit;
 
                 m = (amqp_basic_deliver_t *)fr->payload.params;
                 if ((dit = hash_get_item(&(*chan)->consumers,
@@ -400,7 +400,7 @@ next_frame(amqp_conn_t *conn)
 
             } else if (fr->payload.params->mi->mid == AMQP_BASIC_CANCEL) {
                 amqp_basic_cancel_t *m;
-                hash_item_t *dit;
+                mnhash_item_t *dit;
 
                 m = (amqp_basic_cancel_t *)fr->payload.params;
                 if ((dit = hash_get_item(&(*chan)->consumers,
@@ -832,7 +832,7 @@ send_raw_octets(amqp_conn_t *conn, uint8_t *octets, size_t sz)
 }
 
 
-static bytes_t _capabilities = BYTES_INITIALIZER("capabilities");
+static mnbytes_t _capabilities = BYTES_INITIALIZER("capabilities");
 
 int
 amqp_conn_run(amqp_conn_t *conn)
@@ -841,7 +841,7 @@ amqp_conn_run(amqp_conn_t *conn)
     char greeting[] = {'A', 'M', 'Q', 'P', 0x00, 0x00, 0x09, 0x01};
     amqp_frame_t *fr0, *fr1;
     amqp_connection_start_t *_start; //weakref
-    hash_t *hisprops; //weakref
+    mnhash_t *hisprops; //weakref
     UNUSED amqp_value_t *hiscaps; //weakref
     amqp_connection_start_ok_t *start_ok;
     amqp_connection_tune_t *tune;
@@ -1034,7 +1034,7 @@ amqp_conn_close_fd(amqp_conn_t *conn)
 
 
 static int
-consumer_stop_threads_cb(UNUSED bytes_t *key,
+consumer_stop_threads_cb(UNUSED mnbytes_t *key,
                          amqp_consumer_t *cons,
                          UNUSED void *udata)
 {
@@ -1987,7 +1987,7 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
  * closing
  */
 static int
-close_consumer_fast_cb(UNUSED bytes_t *key,
+close_consumer_fast_cb(UNUSED mnbytes_t *key,
                   amqp_consumer_t*cons,
                   UNUSED void *udata)
 {
@@ -2027,7 +2027,7 @@ amqp_channel_cancel(amqp_channel_t *chan,
 
 
 static int
-close_consumer_cb(UNUSED bytes_t *key,
+close_consumer_cb(UNUSED mnbytes_t *key,
                   amqp_consumer_t*cons,
                   UNUSED void *udata)
 {
@@ -2170,7 +2170,7 @@ amqp_consumer_destroy(amqp_consumer_t **cons)
 
 
 static int
-amqp_consumer_item_fini(bytes_t *key, amqp_consumer_t *cons)
+amqp_consumer_item_fini(mnbytes_t *key, amqp_consumer_t *cons)
 {
     BYTES_DECREF(&key);
     amqp_consumer_destroy(&cons);
@@ -2185,12 +2185,12 @@ amqp_channel_create_consumer(amqp_channel_t *chan,
                              const char *consumer_tag,
                              uint8_t flags)
 {
-    hash_item_t *dit;
+    mnhash_item_t *dit;
     amqp_consumer_t *cons;
     amqp_frame_t *fr0, *fr1;
     amqp_basic_consume_t *m;
     amqp_basic_consume_ok_t *ok;
-    bytes_t *ctag;
+    mnbytes_t *ctag;
 
     fr0 = NULL;
     cons = NULL;

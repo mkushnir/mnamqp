@@ -146,7 +146,7 @@ run0(UNUSED int argc, UNUSED void **argv)
 {
     amqp_conn_t *conn;
     amqp_channel_t *chan;
-    bytestream_t bs;
+    mnbytestream_t bs;
 
     mrkamqp_init();
     conn = amqp_conn_new(host,

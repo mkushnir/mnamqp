@@ -25,7 +25,7 @@ typedef struct _rpc_call_completion {
 
 
 static int
-rpc_call_item_fini(UNUSED bytes_t *key, void *value) {
+rpc_call_item_fini(UNUSED mnbytes_t *key, void *value) {
 
     rpc_call_completion_t *cc;
 
@@ -246,7 +246,7 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
 
     res = 0;
     if (header->payload.header->correlation_id != NULL) {
-        hash_item_t *dit;
+        mnhash_item_t *dit;
 
         if ((dit = hash_get_item(&rpc->calls,
                         header->payload.header->correlation_id)) == NULL) {
@@ -330,8 +330,8 @@ rpc_call_header_completion_cb(UNUSED amqp_channel_t *chan,
                               void *udata)
 {
     struct {
-        bytes_t *reply_to;
-        bytes_t *cid;
+        mnbytes_t *reply_to;
+        mnbytes_t *cid;
         amqp_rpc_request_header_cb_t request_header_cb;
         void *header_udata;
     } *params;
@@ -358,8 +358,8 @@ amqp_rpc_call(amqp_rpc_t *rpc,
 {
     int res;
     struct {
-        bytes_t *reply_to;
-        bytes_t *cid;
+        mnbytes_t *reply_to;
+        mnbytes_t *cid;
         amqp_rpc_request_header_cb_t request_header_cb;
         void *header_udata;
     } params;

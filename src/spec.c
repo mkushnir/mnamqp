@@ -14,7 +14,7 @@ MEMDEBUG_DECLARE(mrkamqp_spec);
 
 #include "diag.h"
 
-hash_t methods;
+mnhash_t methods;
 
 
 #define FPACK(ty, name) pack_##ty(&conn->outs, m->name)
@@ -64,7 +64,7 @@ NEWDECL(mname)                                                 \
 #define STR(mname, __fields)                                   \
 void                                                           \
 amqp_##mname##_str(UNUSED amqp_meth_params_t *params,          \
-                   UNUSED bytestream_t *bs)                    \
+                   UNUSED mnbytestream_t *bs)                    \
 {                                                              \
     amqp_##mname##_t *m;                                       \
     m = (amqp_##mname##_t *)params;                            \
@@ -1443,7 +1443,7 @@ static amqp_method_info_t _methinfo[] = {
 amqp_method_info_t *
 amqp_method_info_get(amqp_meth_id_t mid)
 {
-    hash_item_t *dit;
+    mnhash_item_t *dit;
     amqp_method_info_t *mi;
 
     mi = NULL;
@@ -1460,7 +1460,7 @@ amqp_meth_params_decode(amqp_conn_t *conn,
                         amqp_meth_params_t **params)
 {
     int res;
-    hash_item_t *dit;
+    mnhash_item_t *dit;
     amqp_method_info_t *mi;
 
     if ((dit = hash_get_item(&methods, (void *)(uintptr_t)mid)) == NULL) {
@@ -1478,7 +1478,7 @@ amqp_meth_params_decode(amqp_conn_t *conn,
 void
 amqp_meth_params_dump(amqp_meth_params_t *params)
 {
-    bytestream_t bs;
+    mnbytestream_t bs;
 
     bytestream_init(&bs, 1024);
     params->mi->str(params, &bs);
@@ -1553,7 +1553,7 @@ amqp_header_new(void)
 #define HFSTRT(fl, n) if (m->flags & AMQP_HEADER_F##fl) FSTRT(n)
 
 static void
-amqp_header_str(amqp_header_t *m, bytestream_t *bs)
+amqp_header_str(amqp_header_t *m, mnbytestream_t *bs)
 {
     bytestream_nprintf(bs, 1024, "<basic.header ");
     FSTR(class_id, "%hd");
@@ -1582,7 +1582,7 @@ amqp_header_str(amqp_header_t *m, bytestream_t *bs)
 void
 amqp_header_dump(amqp_header_t *header)
 {
-    bytestream_t bs;
+    mnbytestream_t bs;
 
     bytestream_init(&bs, 1024);
     amqp_header_str(header, &bs);
@@ -1699,7 +1699,7 @@ AMQP_HEADER_SET_DECL(n, ty)                            \
 
 
 #define AMQP_HEADER_SETB(n, f)                         \
-AMQP_HEADER_SET_DECL(n, bytes_t *)                     \
+AMQP_HEADER_SET_DECL(n, mnbytes_t *)                     \
 {                                                      \
     assert(!(header->flags & AMQP_HEADER_F##f));       \
     header->flags |= AMQP_HEADER_F##f;                 \
@@ -1733,8 +1733,8 @@ AMQP_HEADER_SETH(u64, uint64_t)
 AMQP_HEADER_SETH(float, float)
 AMQP_HEADER_SETH(double, double)
 // RabbitMQ doesn't like short str?
-//AMQP_HEADER_SETH(sstr, bytes_t *)
-AMQP_HEADER_SETH(lstr, bytes_t *)
+//AMQP_HEADER_SETH(sstr, mnbytes_t *)
+AMQP_HEADER_SETH(lstr, mnbytes_t *)
 
 
 AMQP_HEADER_SET(delivery_mode, DELIVERY_MODE, uint8_t)

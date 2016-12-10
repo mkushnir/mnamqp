@@ -33,8 +33,8 @@ typedef struct _amqp_conn {
     int capabilities;
 
     int fd;
-    bytestream_t ins;
-    bytestream_t outs;
+    mnbytestream_t ins;
+    mnbytestream_t outs;
     mrkthr_ctx_t *recv_thread;
     mrkthr_ctx_t *send_thread;
     mrkthr_ctx_t *heartbeat_thread;
@@ -44,10 +44,10 @@ typedef struct _amqp_conn {
     mrkthr_signal_t oframe_sig;
     mrkthr_signal_t ping_sig;
 
-    array_t channels;
+    mnarray_t channels;
     struct _amqp_channel *chan0;
     uint16_t error_code;
-    bytes_t *error_msg;
+    mnbytes_t *error_msg;
     int closed:1;
 } amqp_conn_t;
 
@@ -65,7 +65,7 @@ typedef struct _amqp_channel {
     STQUEUE(_amqp_frame, iframes);
     mrkthr_signal_t expect_sig;
     mrkthr_sema_t sync_sema;
-    hash_t consumers;
+    mnhash_t consumers;
     /* strong ref */
     struct _amqp_consumer *default_consumer;
     /* weak ref */
@@ -92,7 +92,7 @@ typedef int (*amqp_consumer_content_cb_t)(amqp_frame_t *,
 
 typedef struct _amqp_consumer {
     amqp_channel_t *chan;
-    bytes_t *consumer_tag;
+    mnbytes_t *consumer_tag;
     mrkthr_signal_t content_sig;
     STQUEUE(_amqp_pending_content, pending_content);
     mrkthr_ctx_t *content_thread;
@@ -126,20 +126,20 @@ typedef struct _amqp_header {
 #define AMQP_HEADER_FAPP_ID             (1 << 3)
 #define AMQP_HEADER_FCLUSTER_ID         (1 << 2)
     uint16_t flags;
-    bytes_t *content_type;
-    bytes_t *content_encoding;
-    hash_t headers;
+    mnbytes_t *content_type;
+    mnbytes_t *content_encoding;
+    mnhash_t headers;
     uint8_t delivery_mode;
     uint8_t priority;
-    bytes_t *correlation_id;
-    bytes_t *reply_to;
-    bytes_t *expiration;
-    bytes_t *message_id;
+    mnbytes_t *correlation_id;
+    mnbytes_t *reply_to;
+    mnbytes_t *expiration;
+    mnbytes_t *message_id;
     uint64_t timestamp;
-    bytes_t *type;
-    bytes_t *user_id;
-    bytes_t *app_id;
-    bytes_t *cluster_id;
+    mnbytes_t *type;
+    mnbytes_t *user_id;
+    mnbytes_t *app_id;
+    mnbytes_t *cluster_id;
 
     uint64_t _received_size;
 } amqp_header_t;
@@ -159,12 +159,12 @@ typedef void (*amqp_rpc_request_header_cb_t)(amqp_header_t *,
 typedef struct _amqp_rpc {
     char *exchange;
     char *routing_key;
-    bytes_t *reply_to;
+    mnbytes_t *reply_to;
     /* weakref */
     amqp_channel_t *chan;
     amqp_consumer_t *cons;
     /* key weakref, value weakref */
-    hash_t calls;
+    mnhash_t calls;
     uint64_t next_id;
     amqp_consumer_content_cb_t cccb;
     amqp_consumer_content_cb_t clcb;
@@ -355,8 +355,8 @@ void AMQP_HEADER_SET_REF(n)(amqp_header_t *header, ty v)       \
 void AMQP_HEADER_SETH_REF(n)(amqp_header_t *header, const char *key, ty val)   \
 
 
-AMQP_HEADER_SET_DECL(content_type, bytes_t *);
-AMQP_HEADER_SET_DECL(content_encoding, bytes_t *);
+AMQP_HEADER_SET_DECL(content_type, mnbytes_t *);
+AMQP_HEADER_SET_DECL(content_encoding, mnbytes_t *);
 
 AMQP_HEADER_SETH_DECL(boolean, char);
 AMQP_HEADER_SETH_DECL(i8, int8_t);
@@ -369,20 +369,20 @@ AMQP_HEADER_SETH_DECL(i64, int64_t);
 AMQP_HEADER_SETH_DECL(u64, uint64_t);
 AMQP_HEADER_SETH_DECL(float, float);
 AMQP_HEADER_SETH_DECL(double, double);
-AMQP_HEADER_SETH_DECL(sstr, bytes_t *);
-AMQP_HEADER_SETH_DECL(lstr, bytes_t *);
+AMQP_HEADER_SETH_DECL(sstr, mnbytes_t *);
+AMQP_HEADER_SETH_DECL(lstr, mnbytes_t *);
 
 AMQP_HEADER_SET_DECL(delivery_mode, uint8_t);
 AMQP_HEADER_SET_DECL(priority, uint8_t);
-AMQP_HEADER_SET_DECL(correlation_id, bytes_t *);
-AMQP_HEADER_SET_DECL(reply_to, bytes_t *);
-AMQP_HEADER_SET_DECL(expiration, bytes_t *);
-AMQP_HEADER_SET_DECL(message_id, bytes_t *);
+AMQP_HEADER_SET_DECL(correlation_id, mnbytes_t *);
+AMQP_HEADER_SET_DECL(reply_to, mnbytes_t *);
+AMQP_HEADER_SET_DECL(expiration, mnbytes_t *);
+AMQP_HEADER_SET_DECL(message_id, mnbytes_t *);
 AMQP_HEADER_SET_DECL(timestamp, uint64_t);
-AMQP_HEADER_SET_DECL(type, bytes_t *);
-AMQP_HEADER_SET_DECL(user_id, bytes_t *);
-AMQP_HEADER_SET_DECL(app_id, bytes_t *);
-AMQP_HEADER_SET_DECL(cluster_id, bytes_t *);
+AMQP_HEADER_SET_DECL(type, mnbytes_t *);
+AMQP_HEADER_SET_DECL(user_id, mnbytes_t *);
+AMQP_HEADER_SET_DECL(app_id, mnbytes_t *);
+AMQP_HEADER_SET_DECL(cluster_id, mnbytes_t *);
 
 
 #define MRKAMQP_STOP_THREADS (-128)

@@ -102,7 +102,7 @@ void usage(char *path)
 }
 
 
-bytes_t _testrpc = BYTES_INITIALIZER("testrpc");
+mnbytes_t _testrpc = BYTES_INITIALIZER("testrpc");
 
 static void
 myhandler(UNUSED const amqp_header_t *hin,
@@ -166,7 +166,7 @@ run_conn(void)
         while (!shutting_down) {
             int res;
 
-            bytes_t *request;
+            mnbytes_t *request;
 
             request = bytes_printf("test %ld", mrkthr_get_now());
             res = amqp_rpc_call(rpc,
