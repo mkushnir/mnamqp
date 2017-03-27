@@ -43,6 +43,8 @@ typedef struct _amqp_conn {
     STQUEUE(_amqp_frame, oframes);
     mrkthr_signal_t oframe_sig;
     mrkthr_signal_t ping_sig;
+    void *(*buffer_alloc)(size_t);
+    void (*buffer_free)(void *);
 
     mnarray_t channels;
     struct _amqp_channel *chan0;
@@ -302,6 +304,16 @@ MRKAMQP_SYNC int amqp_channel_publish_ex(amqp_channel_t *,
                             uint8_t,
                             amqp_header_t *,
                             const char *);
+
+typedef int (*amqp_channel_publish_cb_t)(amqp_conn_t *, void *);
+
+MRKAMQP_SYNC int amqp_channel_publish_ex2(amqp_channel_t *,
+                            const char *,
+                            const char *,
+                            uint8_t,
+                            amqp_header_t *,
+                            amqp_channel_publish_cb_t,
+                            void *);
 
 #define ACK_MULTIPLE                    0x01
 

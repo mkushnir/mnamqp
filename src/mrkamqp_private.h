@@ -85,6 +85,7 @@ struct _amqp_channel;
 struct _amqp_rpc;
 struct _amqp_meth_params;
 struct _amqp_header;
+struct _amqp_header;
 
 typedef void (*amqp_encode)(struct _amqp_value *, mnbytestream_t *);
 typedef ssize_t (*amqp_decode)(struct _amqp_value *, mnbytestream_t *, int);
@@ -129,6 +130,7 @@ typedef struct _amqp_value {
 #define AMQP_FMETHOD 1
 #define AMQP_FHEADER 2
 #define AMQP_FBODY 3
+#define AMQP_FBODYEX 4
 #define AMQP_FHEARTBEAT 8
 
 typedef struct _amqp_frame {
@@ -137,6 +139,10 @@ typedef struct _amqp_frame {
         struct _amqp_meth_params *params;
         struct _amqp_header *header;
         char *body;
+        struct {
+            int (*cb)(struct _amqp_conn *, void *);
+            void *udata;
+        } bodyex;
     } payload;
     uint32_t sz;
     uint16_t chan;
@@ -148,6 +154,7 @@ typedef struct _amqp_frame {
     ty == AMQP_FMETHOD ? "METHOD" :            \
     ty == AMQP_FHEADER ? "HEADER" :            \
     ty == AMQP_FBODY ? "BODY" :                \
+    ty == AMQP_FBODYEX ? "BODYEX" :            \
     ty == AMQP_FHEARTBEAT ? "HEARTBEAT" :      \
     "<unknown>"                                \
 )                                              \
@@ -735,8 +742,8 @@ amqp_value_t *table_get_value(mnhash_t *, mnbytes_t *);
 amqp_frame_t *amqp_frame_new(uint16_t, uint8_t);
 void amqp_frame_destroy_method(amqp_frame_t **);
 void amqp_frame_destroy_header(amqp_frame_t **);
-void amqp_frame_destroy_body(amqp_frame_t **);
-void amqp_frame_destroy(amqp_frame_t **);
+void amqp_frame_destroy_body(struct _amqp_conn *, amqp_frame_t **);
+void amqp_frame_destroy(struct _amqp_conn *, amqp_frame_t **);
 void amqp_frame_dump(amqp_frame_t *);
 
 

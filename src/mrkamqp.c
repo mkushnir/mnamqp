@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -87,6 +88,9 @@ amqp_conn_new(const char *host,
     STQUEUE_INIT(&conn->oframes);
     mrkthr_signal_init(&conn->oframe_sig, NULL);
     mrkthr_signal_init(&conn->ping_sig, NULL);
+
+    conn->buffer_alloc = malloc;
+    conn->buffer_free = free;
 
     array_init(&conn->channels, sizeof(amqp_channel_t *), 0,
                NULL,
@@ -226,7 +230,8 @@ amqp_pending_content_new(void)
 
 
 static void
-amqp_pending_content_destroy(amqp_pending_content_t **pc)
+amqp_pending_content_destroy(amqp_consumer_t *cons,
+                             amqp_pending_content_t **pc)
 {
     if (*pc != NULL) {
         amqp_frame_t *fr;
@@ -236,7 +241,7 @@ amqp_pending_content_destroy(amqp_pending_content_t **pc)
         while ((fr = STQUEUE_HEAD(&(*pc)->body)) != NULL) {
             STQUEUE_DEQUEUE(&(*pc)->body, link);
             STQUEUE_ENTRY_FINI(link, fr);
-            amqp_frame_destroy_body(&fr);
+            amqp_frame_destroy_body(cons->chan->conn, &fr);
         }
         free(*pc);
         *pc = NULL;
@@ -251,8 +256,8 @@ receive_octets(amqp_conn_t *conn, amqp_frame_t *fr)
 
     nread = 0;
     assert(fr->payload.body == NULL);
-    if ((fr->payload.body = malloc(fr->sz)) == NULL) {
-        FAIL("malloc");
+    if ((fr->payload.body = conn->buffer_alloc(fr->sz)) == NULL) {
+        FAIL("buffer_alloc");
     }
     while (nread < fr->sz) {
         if (SNEEDMORE(&conn->ins)) {
@@ -476,7 +481,8 @@ next_frame(amqp_conn_t *conn)
                         }
                     }
                     if (pp == NULL) {
-                        CTRACE("got basic.ack deliver_tag=%ld none expected (dup?)",
+                        CTRACE("got basic.ack deliver_tag=%ld "
+                               "none expected (dup?)",
                                m->delivery_tag);
                     }
                 }
@@ -591,7 +597,7 @@ next_frame(amqp_conn_t *conn)
 
             if (cons == NULL) {
                 CTRACE("got body, not found consumer, discarding frame");
-                amqp_frame_destroy_body(&fr);
+                amqp_frame_destroy_body(cons->chan->conn, &fr);
 
             } else {
                 amqp_pending_content_t *pc;
@@ -600,7 +606,7 @@ next_frame(amqp_conn_t *conn)
                 if (pc == NULL) {
                     CTRACE("got body, not found pending content, "
                            "discarding frame");
-                    amqp_frame_destroy_body(&fr);
+                    amqp_frame_destroy_body(cons->chan->conn, &fr);
                 } else {
                     if (pc->method == NULL || pc->header == NULL) {
                         /*
@@ -608,7 +614,7 @@ next_frame(amqp_conn_t *conn)
                          */
                         CTRACE("found body when no previous method/header, "
                                "discarding frame");
-                        amqp_frame_destroy_body(&fr);
+                        amqp_frame_destroy_body(cons->chan->conn, &fr);
 
                     } else {
                         STQUEUE_ENQUEUE(&pc->body, link, fr);
@@ -640,7 +646,7 @@ next_frame(amqp_conn_t *conn)
                 channel_send_frame(*chan, fr1);
                 fr1 = NULL;
             }
-            amqp_frame_destroy(&fr);
+            amqp_frame_destroy(conn, &fr);
         }
         break;
 
@@ -659,7 +665,7 @@ end:
     return res;
 
 err:
-    amqp_frame_destroy(&fr);
+    amqp_frame_destroy(conn, &fr);
     TR(res);
     goto end;
 }
@@ -743,6 +749,11 @@ pack_frame(amqp_conn_t *conn, amqp_frame_t *fr)
         (void)bytestream_cat(&conn->outs, fr->sz, fr->payload.body);
         break;
 
+    case AMQP_FBODYEX:
+        assert(fr->payload.bodyex.cb != NULL);
+        (void)fr->payload.bodyex.cb(conn, fr->payload.bodyex.udata);
+        break;
+
     case AMQP_FHEARTBEAT:
         assert(fr->sz == 0);
         pack_long(&conn->outs, fr->sz);
@@ -784,7 +795,7 @@ send_thread_worker(UNUSED int argc, void **argv)
 #endif
             bytestream_rewind(&conn->outs);
             pack_frame(conn, fr);
-            amqp_frame_destroy(&fr);
+            amqp_frame_destroy(conn, &fr);
             if (bytestream_produce_data(&conn->outs, conn->fd) != 0) {
                 break;
             }
@@ -872,7 +883,9 @@ amqp_conn_run(amqp_conn_t *conn)
     conn->send_thread = MRKTHR_SPAWN("amqsend", send_thread_worker, conn);
     mrkthr_set_prio(conn->send_thread, 1);
     mrkthr_incabac(conn->send_thread);
-    conn->heartbeat_thread = MRKTHR_SPAWN("amqhrtb", heartbeat_thread_worker, conn);
+    conn->heartbeat_thread = MRKTHR_SPAWN("amqhrtb",
+                                          heartbeat_thread_worker,
+                                          conn);
     mrkthr_set_prio(conn->heartbeat_thread, 1);
     mrkthr_incabac(conn->heartbeat_thread);
 
@@ -1097,7 +1110,8 @@ amqp_conn_stop_threads(amqp_conn_t *conn)
         int res;
 
         mrkthr_decabac(conn->heartbeat_thread);
-        if ((res = mrkthr_set_interrupt_and_join(conn->heartbeat_thread)) != 0) {
+        if ((res = mrkthr_set_interrupt_and_join(
+                        conn->heartbeat_thread)) != 0) {
             //CTRACE("could not see send thread, error: %s", mrkthr_diag_str(res));
         }
         conn->heartbeat_thread = NULL;
@@ -1237,7 +1251,7 @@ amqp_conn_destroy(amqp_conn_t **conn)
         while ((fr = STQUEUE_HEAD(&(*conn)->oframes)) != NULL) {
             STQUEUE_DEQUEUE(&(*conn)->oframes, link);
             STQUEUE_ENTRY_FINI(link, fr);
-            amqp_frame_destroy(&fr);
+            amqp_frame_destroy(*conn, &fr);
         }
         STQUEUE_FINI(&(*conn)->oframes);
 
@@ -1385,7 +1399,7 @@ amqp_channel_destroy(amqp_channel_t **chan)
         while ((fr = STQUEUE_HEAD(&(*chan)->iframes)) != NULL) {
             STQUEUE_DEQUEUE(&(*chan)->iframes, link);
             STQUEUE_ENTRY_FINI(link, fr);
-            amqp_frame_destroy(&fr);
+            amqp_frame_destroy((*chan)->conn, &fr);
         }
         /* must have been finalized in channel_expect_method() */
         if (mrkthr_signal_has_owner(&(*chan)->expect_sig)) {
@@ -1824,7 +1838,6 @@ amqp_channel_publish(amqp_channel_t *chan,
     amqp_frame_t *fr1;
     amqp_basic_publish_t *m;
     amqp_header_t *h;
-    amqp_pending_pub_t pp;
 
     res = 0;
 
@@ -1842,10 +1855,6 @@ amqp_channel_publish(amqp_channel_t *chan,
     if (mrkthr_sema_acquire(&chan->sync_sema) != 0) {
         TRRET(CHANNEL_PUBLISH + 2);
     }
-
-    DTQUEUE_ENTRY_INIT(link, &pp);
-    mrkthr_signal_init(&pp.sig, mrkthr_me());
-    pp.publish_tag = ++chan->publish_tag;
 
     fr1 = amqp_frame_new(chan->id, AMQP_FMETHOD);
     m = NEWREF(basic_publish)();
@@ -1868,8 +1877,9 @@ amqp_channel_publish(amqp_channel_t *chan,
     while (sz > chan->conn->payload_max) {
         fr1 = amqp_frame_new(chan->id, AMQP_FBODY);
         fr1->sz = chan->conn->payload_max;
-        if ((fr1->payload.body = malloc(chan->conn->payload_max)) == NULL) {
-            FAIL("malloc");
+        if ((fr1->payload.body = chan->conn->buffer_alloc(
+                        chan->conn->payload_max)) == NULL) {
+            FAIL("buffer_alloc");
         }
         memcpy(fr1->payload.body, data, chan->conn->payload_max);
         channel_send_frame(chan, fr1);
@@ -1880,8 +1890,8 @@ amqp_channel_publish(amqp_channel_t *chan,
     if (sz > 0) {
         fr1 = amqp_frame_new(chan->id, AMQP_FBODY);
         fr1->sz = sz;
-        if ((fr1->payload.body = malloc(sz)) == NULL) {
-            FAIL("malloc");
+        if ((fr1->payload.body = chan->conn->buffer_alloc(sz)) == NULL) {
+            FAIL("buffer_alloc");
         }
         memcpy(fr1->payload.body, data, sz);
         channel_send_frame(chan, fr1);
@@ -1889,6 +1899,12 @@ amqp_channel_publish(amqp_channel_t *chan,
     fr1 = NULL;
 
     if (chan->confirm_mode) {
+        amqp_pending_pub_t pp;
+
+        DTQUEUE_ENTRY_INIT(link, &pp);
+        mrkthr_signal_init(&pp.sig, mrkthr_me());
+        pp.publish_tag = ++chan->publish_tag;
+
         DTQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
         if ((res = mrkthr_signal_subscribe(&pp.sig)) != 0) {
             DTQUEUE_REMOVE(&chan->pending_pub, link, &pp);
@@ -1896,9 +1912,9 @@ amqp_channel_publish(amqp_channel_t *chan,
                 res = CHANNEL_PUBLISH + 2;
             }
         }
+        mrkthr_signal_fini(&pp.sig);
     }
 
-    mrkthr_signal_fini(&pp.sig);
 
     mrkthr_sema_release(&chan->sync_sema);
     return res;
@@ -1907,16 +1923,15 @@ amqp_channel_publish(amqp_channel_t *chan,
 
 int
 amqp_channel_publish_ex(amqp_channel_t *chan,
-                     const char *exchange,
-                     const char *routing_key,
-                     uint8_t flags,
-                     amqp_header_t *header,
-                     const char *data)
+                        const char *exchange,
+                        const char *routing_key,
+                        uint8_t flags,
+                        amqp_header_t *header,
+                        const char *data)
 {
     int res;
     amqp_frame_t *fr1;
     amqp_basic_publish_t *m;
-    amqp_pending_pub_t pp;
     ssize_t sz;
 
     res = 0;
@@ -1927,10 +1942,6 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     if (chan->closed) {
         TRRET(CHANNEL_PUBLISH + 3);
     }
-
-    DTQUEUE_ENTRY_INIT(link, &pp);
-    mrkthr_signal_init(&pp.sig, mrkthr_me());
-    pp.publish_tag = ++chan->publish_tag;
 
     fr1 = amqp_frame_new(chan->id, AMQP_FMETHOD);
     m = NEWREF(basic_publish)();
@@ -1948,8 +1959,9 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     while (sz > chan->conn->payload_max) {
         fr1 = amqp_frame_new(chan->id, AMQP_FBODY);
         fr1->sz = chan->conn->payload_max;
-        if ((fr1->payload.body = malloc(chan->conn->payload_max)) == NULL) {
-            FAIL("malloc");
+        if ((fr1->payload.body = chan->conn->buffer_alloc(
+                        chan->conn->payload_max)) == NULL) {
+            FAIL("buffer_alloc");
         }
         memcpy(fr1->payload.body, data, chan->conn->payload_max);
         channel_send_frame(chan, fr1);
@@ -1960,8 +1972,8 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     if (sz > 0) {
         fr1 = amqp_frame_new(chan->id, AMQP_FBODY);
         fr1->sz = sz;
-        if ((fr1->payload.body = malloc(sz)) == NULL) {
-            FAIL("malloc");
+        if ((fr1->payload.body = chan->conn->buffer_alloc(sz)) == NULL) {
+            FAIL("buffer_alloc");
         }
         memcpy(fr1->payload.body, data, sz);
         channel_send_frame(chan, fr1);
@@ -1969,6 +1981,12 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
     fr1 = NULL;
 
     if (chan->confirm_mode) {
+        amqp_pending_pub_t pp;
+
+        DTQUEUE_ENTRY_INIT(link, &pp);
+        mrkthr_signal_init(&pp.sig, mrkthr_me());
+        pp.publish_tag = ++chan->publish_tag;
+
         DTQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
         if ((res = mrkthr_signal_subscribe(&pp.sig)) != 0) {
             DTQUEUE_REMOVE(&chan->pending_pub, link, &pp);
@@ -1976,9 +1994,73 @@ amqp_channel_publish_ex(amqp_channel_t *chan,
                 res = CHANNEL_PUBLISH + 4;
             }
         }
+        mrkthr_signal_fini(&pp.sig);
     }
 
-    mrkthr_signal_fini(&pp.sig);
+    return res;
+}
+
+
+int
+amqp_channel_publish_ex2(amqp_channel_t *chan,
+                         const char *exchange,
+                         const char *routing_key,
+                         uint8_t flags,
+                         amqp_header_t *header,
+                         amqp_channel_publish_cb_t cb,
+                         void *udata)
+
+{
+    int res;
+    amqp_frame_t *fr1;
+    amqp_basic_publish_t *m;
+
+    res = 0;
+
+    assert(routing_key != NULL);
+    assert(exchange != NULL);
+
+    if (chan->closed) {
+        TRRET(CHANNEL_PUBLISH + 4);
+    }
+
+    fr1 = amqp_frame_new(chan->id, AMQP_FMETHOD);
+    m = NEWREF(basic_publish)();
+    m->exchange = bytes_new_from_str(exchange);
+    m->routing_key = bytes_new_from_str(routing_key);
+    m->flags = flags;
+    fr1->payload.params = (amqp_meth_params_t *)m;
+    channel_send_frame(chan, fr1);
+
+    fr1 = amqp_frame_new(chan->id, AMQP_FHEADER);
+    fr1->payload.header = header;
+    //sz = header->body_size;
+    channel_send_frame(chan, fr1);
+
+    fr1 = amqp_frame_new(chan->id, AMQP_FBODYEX);
+    fr1->payload.bodyex.cb = cb;
+    fr1->payload.bodyex.udata = udata;
+    channel_send_frame(chan, fr1);
+
+    fr1 = NULL;
+
+    if (chan->confirm_mode) {
+        amqp_pending_pub_t pp;
+
+        DTQUEUE_ENTRY_INIT(link, &pp);
+        mrkthr_signal_init(&pp.sig, mrkthr_me());
+        pp.publish_tag = ++chan->publish_tag;
+
+        DTQUEUE_ENQUEUE(&chan->pending_pub, link, &pp);
+        if ((res = mrkthr_signal_subscribe(&pp.sig)) != 0) {
+            DTQUEUE_REMOVE(&chan->pending_pub, link, &pp);
+            if (res != MRKAMQP_PROTOCOL_ERROR) {
+                res = CHANNEL_PUBLISH + 4;
+            }
+        }
+        mrkthr_signal_fini(&pp.sig);
+    }
+
     return res;
 }
 
@@ -2114,7 +2196,7 @@ amqp_channel_drain_methods(amqp_channel_t *chan)
         }
         amqp_frame_dump(fr);
         TRACEC("\n");
-        amqp_frame_destroy(&fr);
+        amqp_frame_destroy(chan->conn, &fr);
     }
 }
 
@@ -2154,13 +2236,14 @@ amqp_consumer_destroy(amqp_consumer_t **cons)
         (*cons)->chan = NULL;
         BYTES_DECREF(&(*cons)->consumer_tag);
         if (mrkthr_signal_has_owner(&(*cons)->content_sig)) {
-            CTRACE("content_sig owner found during consumer destroy: %p", (*cons)->content_sig.owner);
+            CTRACE("content_sig owner found during consumer destroy: %p",
+                   (*cons)->content_sig.owner);
         }
         //assert(!mrkthr_signal_has_owner(&(*cons)->content_sig));
         while ((pc = STQUEUE_HEAD(&(*cons)->pending_content)) != NULL) {
             STQUEUE_DEQUEUE(&(*cons)->pending_content, link);
             STQUEUE_ENTRY_FINI(link, pc);
-            amqp_pending_content_destroy(&pc);
+            amqp_pending_content_destroy(*cons, &pc);
         }
         STQUEUE_FINI(&(*cons)->pending_content);
         free(*cons);
@@ -2321,9 +2404,9 @@ content_thread_worker(UNUSED int argc, void **argv)
              * XXX content_cb ?
              */
 
-            if ((data = malloc(
+            if ((data = cons->chan->conn->buffer_alloc(
                     pc->header->payload.header->body_size)) == NULL) {
-                FAIL("malloc");
+                FAIL("buffer_alloc");
             }
 
             while (pc->header->payload.header->body_size >
@@ -2344,7 +2427,7 @@ content_thread_worker(UNUSED int argc, void **argv)
                 pc->header->payload.header->_received_size += fr->sz;
                 STQUEUE_DEQUEUE(&pc->body, link);
                 STQUEUE_ENTRY_FINI(link, fr);
-                amqp_frame_destroy(&fr);
+                amqp_frame_destroy(cons->chan->conn, &fr);
                 /*
                  * XXX content_cb ?
                  */
@@ -2385,7 +2468,7 @@ content_thread_worker(UNUSED int argc, void **argv)
 
             STQUEUE_DEQUEUE(&cons->pending_content, link);
             STQUEUE_ENTRY_FINI(link, pc);
-            amqp_pending_content_destroy(&pc);
+            amqp_pending_content_destroy(cons, &pc);
 
             if (res != 0) {
                 TR(res);
@@ -2402,7 +2485,7 @@ content_thread_worker(UNUSED int argc, void **argv)
 
             STQUEUE_DEQUEUE(&cons->pending_content, link);
             STQUEUE_ENTRY_FINI(link, pc);
-            amqp_pending_content_destroy(&pc);
+            amqp_pending_content_destroy(cons, &pc);
 
             cons->closed = 1;
 

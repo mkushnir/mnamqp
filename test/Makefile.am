@@ -40,7 +40,7 @@ testham_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c
 testham_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
-	$(AM_V_GEN) /bin/sh ../gen-diag mrkamqp
+	$(AM_V_GEN) cat ../src/diag.txt | sort -u | /bin/sh ./gen-diag mrkamqp ../src
 
 testham-run: testham
 	@if test -x $>; \

@@ -70,11 +70,11 @@ amqp_frame_destroy_header(amqp_frame_t **fr)
 
 
 void
-amqp_frame_destroy_body(amqp_frame_t **fr)
+amqp_frame_destroy_body(amqp_conn_t *conn, amqp_frame_t **fr)
 {
     if (*fr != NULL) {
         if ((*fr)->payload.body != NULL) {
-            free((*fr)->payload.body);
+            conn->buffer_free((*fr)->payload.body);
         }
         free(*fr);
         *fr = NULL;
@@ -83,7 +83,7 @@ amqp_frame_destroy_body(amqp_frame_t **fr)
 
 
 void
-amqp_frame_destroy(amqp_frame_t **fr)
+amqp_frame_destroy(amqp_conn_t *conn, amqp_frame_t **fr)
 {
     if (*fr != NULL) {
         switch ((*fr)->type) {
@@ -97,11 +97,14 @@ amqp_frame_destroy(amqp_frame_t **fr)
 
         case AMQP_FBODY:
             if ((*fr)->payload.body != NULL) {
-                free((*fr)->payload.body);
+                conn->buffer_free((*fr)->payload.body);
             }
             break;
 
+        case AMQP_FBODYEX:
+            break;
         }
+
         free(*fr);
         *fr = NULL;
     }
