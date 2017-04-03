@@ -261,7 +261,7 @@ receive_octets(amqp_conn_t *conn, amqp_frame_t *fr)
     }
     while (nread < fr->sz) {
         if (SNEEDMORE(&conn->ins)) {
-            if (bytestream_consume_data(&conn->ins, conn->fd) != 0) {
+            if (bytestream_consume_data(&conn->ins, (void *)(intptr_t)conn->fd) != 0) {
                 break;
             }
             conn->last_sock_op = mrkthr_get_now();
@@ -286,19 +286,19 @@ next_frame(amqp_conn_t *conn)
     res = 0;
     fr = amqp_frame_new(0, 0);
 
-    if (unpack_octet(&conn->ins, conn->fd, &fr->type) < 0) {
+    if (unpack_octet(&conn->ins, (void *)(intptr_t)conn->fd, &fr->type) < 0) {
         res = UNPACK + 200;
         goto err;
     }
     //CTRACE("type=%hhd", fr->type);
 
-    if (unpack_short(&conn->ins, conn->fd, &fr->chan) < 0) {
+    if (unpack_short(&conn->ins, (void *)(intptr_t)conn->fd, &fr->chan) < 0) {
         res = UNPACK + 201;
         goto err;
     }
     //CTRACE("chan=%hd", fr->chan);
 
-    if (unpack_long(&conn->ins, conn->fd, &fr->sz) < 0) {
+    if (unpack_long(&conn->ins, (void *)(intptr_t)conn->fd, &fr->sz) < 0) {
         res = UNPACK + 202;
         goto err;
     }
@@ -308,14 +308,14 @@ next_frame(amqp_conn_t *conn)
 
     SADVANCEPOS(&conn->ins, fr->sz);
     while (SNEEDMORE(&conn->ins)) {
-        if (bytestream_consume_data(&conn->ins, conn->fd) != 0) {
+        if (bytestream_consume_data(&conn->ins, (void *)(intptr_t)conn->fd) != 0) {
             res = UNPACK_ECONSUME;
             goto err;
         }
         conn->last_sock_op = mrkthr_get_now();
     }
 
-    if (unpack_octet(&conn->ins, conn->fd, &eof) < 0) {
+    if (unpack_octet(&conn->ins, (void *)(intptr_t)conn->fd, &eof) < 0) {
         res = UNPACK + 203;
         goto err;
     }
@@ -342,12 +342,12 @@ next_frame(amqp_conn_t *conn)
             uint16_t cls, meth;
             amqp_meth_id_t mid;
 
-            if (unpack_short(&conn->ins, conn->fd, &cls) < 0) {
+            if (unpack_short(&conn->ins, (void *)(intptr_t)conn->fd, &cls) < 0) {
                 res = UNPACK + 210;
                 goto err;
             }
 
-            if (unpack_short(&conn->ins, conn->fd, &meth) < 0) {
+            if (unpack_short(&conn->ins, (void *)(intptr_t)conn->fd, &meth) < 0) {
                 res = UNPACK + 211;
                 goto err;
             }
@@ -796,7 +796,7 @@ send_thread_worker(UNUSED int argc, void **argv)
             bytestream_rewind(&conn->outs);
             pack_frame(conn, fr);
             amqp_frame_destroy(conn, &fr);
-            if (bytestream_produce_data(&conn->outs, conn->fd) != 0) {
+            if (bytestream_produce_data(&conn->outs, (void *)(intptr_t)conn->fd) != 0) {
                 break;
             }
             conn->last_sock_op = mrkthr_get_now();
@@ -837,7 +837,7 @@ send_raw_octets(amqp_conn_t *conn, uint8_t *octets, size_t sz)
 
     bytestream_rewind(&conn->outs);
     (void)bytestream_cat(&conn->outs, sz, (char *)octets);
-    res = bytestream_produce_data(&conn->outs, conn->fd);
+    res = bytestream_produce_data(&conn->outs, (void *)(intptr_t)conn->fd);
     conn->last_sock_op = mrkthr_get_now();
     return res;
 }

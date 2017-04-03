@@ -42,7 +42,7 @@ pack_octet(mnbytestream_t *bs, uint8_t v)
 
 
 ssize_t
-unpack_octet(mnbytestream_t *bs, int fd, uint8_t *v)
+unpack_octet(mnbytestream_t *bs, void *fd, uint8_t *v)
 {
     while (SAVAIL(bs) < (ssize_t)sizeof(uint8_t)) {
         if (bytestream_consume_data(bs, fd) != 0) {
@@ -72,7 +72,7 @@ pack_short(mnbytestream_t *bs, uint16_t v)
 
 
 ssize_t
-unpack_short(mnbytestream_t *bs, int fd, uint16_t *v)
+unpack_short(mnbytestream_t *bs, void *fd, uint16_t *v)
 {
     union {
         char *c;
@@ -108,7 +108,7 @@ pack_long(mnbytestream_t *bs, uint32_t v)
 
 
 ssize_t
-unpack_long(mnbytestream_t *bs, int fd, uint32_t *v)
+unpack_long(mnbytestream_t *bs, void *fd, uint32_t *v)
 {
     union {
         char *c;
@@ -144,7 +144,7 @@ pack_longlong(mnbytestream_t *bs, uint64_t v)
 
 
 ssize_t
-unpack_longlong(mnbytestream_t *bs, int fd, uint64_t *v)
+unpack_longlong(mnbytestream_t *bs, void *fd, uint64_t *v)
 {
     union {
         char *c;
@@ -180,7 +180,7 @@ pack_float(mnbytestream_t *bs, float v)
 
 
 ssize_t
-unpack_float(mnbytestream_t *bs, int fd, float *v)
+unpack_float(mnbytestream_t *bs, void *fd, float *v)
 {
     union {
         char *c;
@@ -216,7 +216,7 @@ pack_double(mnbytestream_t *bs, double v)
 
 
 ssize_t
-unpack_double(mnbytestream_t *bs, int fd, double *v)
+unpack_double(mnbytestream_t *bs, void *fd, double *v)
 {
     union {
         char *c;
@@ -256,7 +256,7 @@ pack_shortstr(mnbytestream_t *bs, mnbytes_t *s)
 
 
 ssize_t
-unpack_shortstr(mnbytestream_t *bs, int fd, mnbytes_t **v)
+unpack_shortstr(mnbytestream_t *bs, void *fd, mnbytes_t **v)
 {
     uint8_t sz;
 
@@ -304,7 +304,7 @@ pack_longstr(mnbytestream_t *bs, mnbytes_t *s)
 
 
 ssize_t
-unpack_longstr(mnbytestream_t *bs, int fd, mnbytes_t **v)
+unpack_longstr(mnbytestream_t *bs, void *fd, mnbytes_t **v)
 {
     uint32_t sz;
 
@@ -344,7 +344,7 @@ pack_field_value(mnbytestream_t *bs, amqp_value_t *v)
 
 
 static ssize_t
-unpack_field_value(mnbytestream_t *bs, int fd, amqp_value_t **v)
+unpack_field_value(mnbytestream_t *bs, void *fd, amqp_value_t **v)
 {
     amqp_type_t *ty;
     ssize_t res0, res1;
@@ -599,7 +599,7 @@ table_str(mnhash_t *v, mnbytestream_t *bs)
 
 
 ssize_t
-unpack_table(mnbytestream_t *bs, int fd, mnhash_t *v)
+unpack_table(mnbytestream_t *bs, void *fd, mnhash_t *v)
 {
     uint32_t sz;
     ssize_t nread;
@@ -677,7 +677,7 @@ array_item_fini(amqp_value_t **v)
 
 
 ssize_t
-unpack_array(mnbytestream_t *bs, int fd, mnarray_t *v)
+unpack_array(mnbytestream_t *bs, void *fd, mnarray_t *v)
 {
     uint32_t elnum, i;
     ssize_t nread;
@@ -724,7 +724,7 @@ enc_bool(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_bool(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_bool(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_octet(bs, fd, (uint8_t *)&v->value.b);
 }
@@ -741,7 +741,7 @@ enc_int8(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_int8(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_int8(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_octet(bs, fd, (uint8_t *)&v->value.i8);
 }
@@ -758,7 +758,7 @@ enc_uint8(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_uint8(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_uint8(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_octet(bs, fd, &v->value.u8);
 }
@@ -775,7 +775,7 @@ enc_int16(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_int16(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_int16(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_short(bs, fd, (uint16_t *)&v->value.i16);
 }
@@ -792,7 +792,7 @@ enc_uint16(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_uint16(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_uint16(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_short(bs, fd, &v->value.u16);
 }
@@ -809,7 +809,7 @@ enc_int32(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_int32(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_int32(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_long(bs, fd, (uint32_t *)&v->value.i32);
 }
@@ -826,7 +826,7 @@ enc_uint32(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_uint32(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_uint32(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_long(bs, fd, &v->value.u32);
 }
@@ -843,7 +843,7 @@ enc_int64(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_int64(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_int64(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_longlong(bs, fd, (uint64_t *)&v->value.i64);
 }
@@ -860,7 +860,7 @@ enc_uint64(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_uint64(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_uint64(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_longlong(bs, fd, &v->value.u64);
 }
@@ -877,7 +877,7 @@ enc_float(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_float(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_float(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_float(bs, fd, &v->value.f);
 }
@@ -894,7 +894,7 @@ enc_double(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_double(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_double(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_double(bs, fd, &v->value.d);
 }
@@ -912,7 +912,7 @@ enc_decimal(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_decimal(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_decimal(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     ssize_t res0, res1;
 
@@ -938,7 +938,7 @@ enc_sstr(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_sstr(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_sstr(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_shortstr(bs, fd, &v->value.str);
 }
@@ -955,7 +955,7 @@ enc_lstr(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_lstr(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_lstr(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_longstr(bs, fd, &v->value.str);
 }
@@ -978,7 +978,7 @@ enc_array(UNUSED amqp_value_t *v, UNUSED mnbytestream_t *bs)
 
 
 static ssize_t
-dec_array(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_array(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     return unpack_array(bs, fd, &v->value.a);
 }
@@ -1002,7 +1002,7 @@ enc_table(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_table(amqp_value_t *v, mnbytestream_t *bs, int fd)
+dec_table(amqp_value_t *v, mnbytestream_t *bs, void *fd)
 {
     init_table(&v->value.t);
     return unpack_table(bs, fd, &v->value.t);
@@ -1027,7 +1027,7 @@ enc_void(amqp_value_t *v, mnbytestream_t *bs)
 
 
 static ssize_t
-dec_void(UNUSED amqp_value_t *v, UNUSED mnbytestream_t *bs, UNUSED int fd)
+dec_void(UNUSED amqp_value_t *v, UNUSED mnbytestream_t *bs, UNUSED void *fd)
 {
     return 0;
 }

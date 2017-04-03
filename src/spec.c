@@ -87,10 +87,12 @@ amqp_##mname##_enc(UNUSED amqp_meth_params_t *self,    \
 }                                                      \
 
 
-#define FUNPACK(ty, name)                              \
-if (unpack_##ty(&conn->ins, conn->fd, &m->name) < 0) { \
-    TRRET(UNPACK + 100);                               \
-}                                                      \
+#define FUNPACK(ty, name)                      \
+if (unpack_##ty(&conn->ins,                    \
+                (void *)(intptr_t)conn->fd,    \
+                &m->name) < 0) {               \
+    TRRET(UNPACK + 100);                       \
+}                                              \
 
 
 #define DEC(mname, __fields)                                   \

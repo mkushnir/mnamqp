@@ -88,7 +88,7 @@ struct _amqp_header;
 struct _amqp_header;
 
 typedef void (*amqp_encode)(struct _amqp_value *, mnbytestream_t *);
-typedef ssize_t (*amqp_decode)(struct _amqp_value *, mnbytestream_t *, int);
+typedef ssize_t (*amqp_decode)(struct _amqp_value *, mnbytestream_t *, void *);
 typedef void (*amqp_kill)(struct _amqp_value *);
 
 typedef struct _amqp_type {
@@ -688,26 +688,26 @@ MPARAMS(basic_nack,
 #define UNPACK_ETAG (-3)
 
 void pack_octet(mnbytestream_t *, uint8_t);
-ssize_t unpack_octet(mnbytestream_t *, int, uint8_t *);
+ssize_t unpack_octet(mnbytestream_t *, void *, uint8_t *);
 void pack_short(mnbytestream_t *, uint16_t);
-ssize_t unpack_short(mnbytestream_t *, int, uint16_t *);
+ssize_t unpack_short(mnbytestream_t *, void *, uint16_t *);
 void pack_long(mnbytestream_t *, uint32_t);
-ssize_t unpack_long(mnbytestream_t *, int, uint32_t *);
+ssize_t unpack_long(mnbytestream_t *, void *, uint32_t *);
 void pack_longlong(mnbytestream_t *, uint64_t);
-ssize_t unpack_longlong(mnbytestream_t *, int, uint64_t *v);
+ssize_t unpack_longlong(mnbytestream_t *, void *, uint64_t *v);
 void pack_float(mnbytestream_t *, float);
-ssize_t unpack_float(mnbytestream_t *, int, float *);
+ssize_t unpack_float(mnbytestream_t *, void *, float *);
 void pack_double(mnbytestream_t *, double);
-ssize_t unpack_double(mnbytestream_t *, int, double *);
+ssize_t unpack_double(mnbytestream_t *, void *, double *);
 void pack_shortstr(mnbytestream_t *, mnbytes_t *);
-ssize_t unpack_shortstr(mnbytestream_t *, int, mnbytes_t **);
+ssize_t unpack_shortstr(mnbytestream_t *, void *, mnbytes_t **);
 void pack_longstr(mnbytestream_t *, mnbytes_t *);
-ssize_t unpack_longstr(mnbytestream_t *, int, mnbytes_t **);
+ssize_t unpack_longstr(mnbytestream_t *, void *, mnbytes_t **);
 void pack_table(mnbytestream_t *, mnhash_t *);
-ssize_t unpack_table(mnbytestream_t *, int, mnhash_t *);
+ssize_t unpack_table(mnbytestream_t *, void *, mnhash_t *);
 void init_table(mnhash_t *);
 
-int amqp_decode_table(mnbytestream_t *, int, amqp_value_t **);
+int amqp_decode_table(mnbytestream_t *, void *, amqp_value_t **);
 amqp_value_t *amqp_value_new(uint8_t);
 void amqp_value_destroy(amqp_value_t **);
 
