@@ -8,7 +8,8 @@ noinst_PROGRAMS = testfoo testpubsub testrpc testspam testham
 
 noinst_HEADERS = unittest.h
 
-BUILT_SOURCES = ../src/diag.c ../src/diag.h
+diags = ../src/diag.txt
+BUILT_SOURCES = diag.c diag.h
 
 if DEBUG
 DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
@@ -16,31 +17,31 @@ else
 DEBUG_FLAGS = -DNDEBUG -O3
 endif
 
-nodist_testfoo_SOURCES = ../src/diag.c
+nodist_testfoo_SOURCES = diag.c
 testfoo_SOURCES = testfoo.c
 testfoo_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
-testfoo_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
+testfoo_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp -lmndiag
 
-nodist_testpubsub_SOURCES = ../src/diag.c
+nodist_testpubsub_SOURCES = diag.c
 testpubsub_SOURCES = testpubsub.c
 testpubsub_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
-testpubsub_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
+testpubsub_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp -lmndiag
 
-nodist_testrpc_SOURCES = ../src/diag.c
+nodist_testrpc_SOURCES = diag.c
 testrpc_SOURCES = testrpc.c
 testrpc_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
-testrpc_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
+testrpc_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp -lmndiag
 
 testspam_SOURCES = testspam.c mygauge.c mygauge.h
 testspam_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
-testspam_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
+testspam_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp -lmndiag
 
 testham_SOURCES = testham.c mygauge.c mygauge.h
 testham_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
-testham_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp
+testham_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp -lmndiag
 
-../src/diag.c ../src/diag.h: ../src/diag.txt
-	$(AM_V_GEN) cat ../src/diag.txt | sort -u | /bin/sh ./gen-diag mrkamqp ../src
+diag.c diag.h: $(diags)
+	$(AM_V_GEN) cat $(diags) | sort -u >diag.txt.tmp && mndiagen -S diag.txt.tmp -L mrkamqp -H diag.h -C diag.c ../*.[ch] ./*.[ch]
 
 testham-run: testham
 	@if test -x $>; \
