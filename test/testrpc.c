@@ -177,7 +177,7 @@ run_conn(void)
                                 NULL);
             BYTES_DECREF(&request);
             if (res != 0) {
-                if (res != MRKTHR_WAIT_TIMEOUT) {
+                if (res != (int)MRKTHR_WAIT_TIMEOUT) {
                     CTRACE("breaking loop ...");
                     break;
                 } else {
