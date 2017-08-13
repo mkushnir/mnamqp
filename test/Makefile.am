@@ -41,7 +41,7 @@ testham_CFLAGS = @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c
 testham_LDFLAGS = -L$(libdir) -lmrkcommon -lmrkthr -L$(top_srcdir)/src/.libs -lmrkamqp -lmndiag
 
 diag.c diag.h: $(diags)
-	$(AM_V_GEN) cat $(diags) | sort -u >diag.txt.tmp && mndiagen -S diag.txt.tmp -L mrkamqp -H diag.h -C diag.c ../*.[ch] ./*.[ch]
+	$(AM_V_GEN) cat $(diags) | sort -u >diag.txt.tmp && mndiagen -v -S diag.txt.tmp -L mrkamqp -H diag.h -C diag.c ../*.[ch] ./*.[ch]
 
 testham-run: testham
 	@if test -x $>; \
