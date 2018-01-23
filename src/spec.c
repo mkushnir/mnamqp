@@ -1,3 +1,5 @@
+#include <inttypes.h>
+
 #ifdef DO_MEMDEBUG
 #include <mrkcommon/memdebug.h>
 MEMDEBUG_DECLARE(mrkamqp_spec);
@@ -243,7 +245,7 @@ NEW(connection_tune, 4,
 )
 STR(connection_tune,
     FSTR(channel_max, "%hd");
-    FSTR(frame_max, "%ld");
+    FSTR(frame_max, "%u");
     FSTR(heartbeat, "%hd");
 )
 ENC(connection_tune,
@@ -270,7 +272,7 @@ NEW(connection_tune_ok, 5,
 )
 STR(connection_tune_ok,
     FSTR(channel_max, "%hd");
-    FSTR(frame_max, "%ld");
+    FSTR(frame_max, "%u");
     FSTR(heartbeat, "%hd");
 )
 ENC(connection_tune_ok,
@@ -410,7 +412,7 @@ NEW(channel_open_ok, 11,
     m->channel_id = 0;
 )
 STR(channel_open_ok,
-    FSTR(channel_id, "%ld");
+    FSTR(channel_id, "%u");
 )
 ENC(channel_open_ok,
     FPACK(long, channel_id);
@@ -1193,7 +1195,7 @@ NEW(basic_get_ok, 42,
     m->message_count = 0;
 )
 STR(basic_get_ok,
-    FSTR(delivery_tag, "016lx");
+    FSTR(delivery_tag, "%016lx");
     FSTR(flags, "%02hhx");
     FSTRB(exchange);
     FSTRB(routing_key);
@@ -1560,7 +1562,7 @@ amqp_header_str(amqp_header_t *m, mnbytestream_t *bs)
     bytestream_nprintf(bs, 1024, "<basic.header ");
     FSTR(class_id, "%hd");
     FSTR(weight, "%hd");
-    FSTR(body_size, "%lld");
+    FSTR(body_size, "%"PRIu64);
     FSTR(flags, "%04hx");
     HFSTRB(CONTENT_TYPE, content_type);
     HFSTRB(CONTENT_ENCODING, content_encoding);
@@ -1571,7 +1573,7 @@ amqp_header_str(amqp_header_t *m, mnbytestream_t *bs)
     HFSTRB(REPLY_TO, reply_to);
     HFSTRB(EXPIRATION, expiration);
     HFSTRB(MESSAGE_ID, message_id);
-    HFSTR(TIMESTAMP, timestamp, "%llx");
+    HFSTR(TIMESTAMP, timestamp, "%"PRIx64);
     HFSTRB(TYPE, type);
     HFSTRB(USER_ID, user_id);
     HFSTRB(APP_ID, app_id);

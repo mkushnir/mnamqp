@@ -555,7 +555,7 @@ table_str_cb(mnbytes_t *key, amqp_value_t *val, mnbytestream_t *bs)
         break;
 
     case AMQP_TDOUBLE:
-        (void)bytestream_nprintf(bs, 1024, "%d ", val->value.d);
+        (void)bytestream_nprintf(bs, 1024, "%lf ", val->value.d);
         break;
 
     case AMQP_TSSTR:
