@@ -56,7 +56,7 @@ mypub(UNUSED int argc, void **argv)
         char buf[1024];
 
         mrkthr_sleep(15000);
-        snprintf(buf, sizeof(buf), "data %ld", mrkthr_get_now());
+        snprintf(buf, sizeof(buf), "data %ld", mrkthr_get_now_nsec());
         TRACEC("%s", buf);
         //if (amqp_channel_publish(chan,
         //                         "",

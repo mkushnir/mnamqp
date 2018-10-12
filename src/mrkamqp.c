@@ -264,7 +264,7 @@ receive_octets(amqp_conn_t *conn, amqp_frame_t *fr)
             if (bytestream_consume_data(&conn->ins, (void *)(intptr_t)conn->fd) != 0) {
                 break;
             }
-            conn->last_sock_op = mrkthr_get_now();
+            conn->last_sock_op = mrkthr_get_now_nsec();
         }
         need = MIN(fr->sz - nread, SEOD(&conn->ins) - SPOS(&conn->ins));
         memcpy(fr->payload.body + nread, SPDATA(&conn->ins), need);
@@ -312,7 +312,7 @@ next_frame(amqp_conn_t *conn)
             res = UNPACK_ECONSUME;
             goto err;
         }
-        conn->last_sock_op = mrkthr_get_now();
+        conn->last_sock_op = mrkthr_get_now_nsec();
     }
 
     if (unpack_octet(&conn->ins, (void *)(intptr_t)conn->fd, &eof) < 0) {
@@ -799,7 +799,7 @@ send_thread_worker(UNUSED int argc, void **argv)
             if (bytestream_produce_data(&conn->outs, (void *)(intptr_t)conn->fd) != 0) {
                 break;
             }
-            conn->last_sock_op = mrkthr_get_now();
+            conn->last_sock_op = mrkthr_get_now_nsec();
         }
     }
     mrkthr_signal_fini(&conn->oframe_sig);
@@ -820,7 +820,7 @@ heartbeat_thread_worker(UNUSED int argc, void **argv)
         if (mrkthr_sleep(conn->heartbeat * 1000) != 0) {
             break;
         }
-        now = mrkthr_get_now();
+        now = mrkthr_get_now_nsec();
         if (((now - conn->last_sock_op) / 1000000000) > (conn->heartbeat / 2)) {
             if (amqp_conn_ping(conn) != 0) {
                 break;
@@ -838,7 +838,7 @@ send_raw_octets(amqp_conn_t *conn, uint8_t *octets, size_t sz)
     bytestream_rewind(&conn->outs);
     (void)bytestream_cat(&conn->outs, sz, (char *)octets);
     res = bytestream_produce_data(&conn->outs, (void *)(intptr_t)conn->fd);
-    conn->last_sock_op = mrkthr_get_now();
+    conn->last_sock_op = mrkthr_get_now_nsec();
     return res;
 }
 

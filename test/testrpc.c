@@ -168,7 +168,7 @@ run_conn(void)
 
             mnbytes_t *request;
 
-            request = bytes_printf("test %ld", mrkthr_get_now());
+            request = bytes_printf("test %ld", mrkthr_get_now_nsec());
             res = amqp_rpc_call(rpc,
                                 (char *)request->data,
                                 request->sz,

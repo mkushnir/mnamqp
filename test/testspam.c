@@ -183,7 +183,7 @@ run0(UNUSED int argc, UNUSED void **argv)
         } else {
             payload_size = (ssize_t)lo_payload_size;
         }
-        before = MRKTHR_GET_NOW_PRECISE_FSEC();
+        before = MRKTHR_GET_NOW_FSEC_PRECISE();
         res = amqp_channel_publish(chan,
                                    exchange,
                                    routing_key,
@@ -192,7 +192,7 @@ run0(UNUSED int argc, UNUSED void **argv)
                                    NULL,
                                    (char *)SDATA(&bs, 0),
                                    payload_size);
-        after = MRKTHR_GET_NOW_PRECISE_FSEC();
+        after = MRKTHR_GET_NOW_FSEC_PRECISE();
         //CTRACE("res=%d time=%lf", res, after - before);
         mrkthr_sleep(publish_sleep);
         mygauge_incr(&published, 1);
