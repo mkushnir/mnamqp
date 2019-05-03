@@ -251,7 +251,7 @@ pack_shortstr(mnbytestream_t *bs, mnbytes_t *s)
      */
     u.sz = (uint8_t)s->sz - 1;
     (void)bytestream_cat(bs, sizeof(uint8_t), &u.c);
-    (void)bytestream_cat(bs, u.sz, (char *)BDATA(s));
+    (void)bytestream_cat(bs, u.sz, BCDATA(s));
 }
 
 
@@ -299,7 +299,7 @@ pack_longstr(mnbytestream_t *bs, mnbytes_t *s)
      * discard terminating zero, not to be counted in AMQP
      */
     (void)bytestream_cat(bs, sizeof(uint32_t), &u.c);
-    (void)bytestream_cat(bs, s->sz - 1, (char *)BDATA(s));
+    (void)bytestream_cat(bs, s->sz - 1, BCDATA(s));
 }
 
 

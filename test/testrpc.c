@@ -170,7 +170,7 @@ run_conn(void)
 
             request = bytes_printf("test %ld", mrkthr_get_now_nsec());
             res = amqp_rpc_call(rpc,
-                                (char *)BDATA(request),
+                                BCDATA(request),
                                 BSZ(request),
                                 NULL,
                                 respcb,

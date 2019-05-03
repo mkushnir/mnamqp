@@ -427,7 +427,7 @@ runcons(UNUSED int argc, void **argv)
 
         if (amqp_channel_bind_queue_ex(
                     g.chan,
-                    (char *)BDATA(params.qname),
+                    BCDATA(params.qname),
                     exchange,
                     routing_key,
                     0,
@@ -445,7 +445,7 @@ runcons(UNUSED int argc, void **argv)
 
     assert(params.qname != NULL);
     if ((cons = amqp_channel_create_consumer(g.chan,
-                                             (char *)BDATA(params.qname),
+                                             BCDATA(params.qname),
                                              NULL,
                                              0)) == NULL) {
         goto err;

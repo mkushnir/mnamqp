@@ -2517,7 +2517,7 @@ amqp_consumer_handle_content_spawn(amqp_consumer_t *cons,
     cons->content_cb = ctcb;
     cons->cancel_cb = clcb;
     cons->content_udata = udata;
-    cons->content_thread = MRKTHR_SPAWN((char *)BDATA(cons->consumer_tag),
+    cons->content_thread = MRKTHR_SPAWN(BCDATA(cons->consumer_tag),
                                         content_thread_worker,
                                         cons);
     return mrkthr_join(cons->content_thread);
@@ -2555,7 +2555,7 @@ amqp_close_consumer(amqp_consumer_t *cons)
         cons->closed = 1;
         assert(cons->consumer_tag != NULL);
         if (amqp_channel_cancel(cons->chan,
-                                (const char *)BDATA(cons->consumer_tag),
+                                BCDATA(cons->consumer_tag),
                                 0) != 0) {
             TR(AMQP_CLOSE_CONSUMER + 1);
         }
