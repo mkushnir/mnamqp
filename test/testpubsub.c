@@ -11,12 +11,12 @@
 #include <fcntl.h> /* open(2) */
 
 #define TRRET_DEBUG
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/traversedir.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/traversedir.h>
 
-#include <mrkthr.h>
+#include <mnthr.h>
 
-#include <mrkamqp_private.h>
+#include <mnamqp_private.h>
 
 
 #include "diag.h"
@@ -43,14 +43,14 @@ UNUSED
 static void
 myinfo(UNUSED int sig)
 {
-    mrkthr_dump_all_ctxes();
+    mnthr_dump_all_ctxes();
 }
 
 
 static void
 _shutdown(void)
 {
-    mrkamqp_fini();
+    mnamqp_fini();
 
     {
         char *s[] = {src, dest};
@@ -63,7 +63,7 @@ _shutdown(void)
         }
     }
 
-    mrkthr_shutdown();
+    mnthr_shutdown();
 }
 
 
@@ -88,7 +88,7 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
 static void
 myterm(UNUSED int sig)
 {
-    (void)MRKTHR_SPAWN("sigshutdown", sigshutdown);
+    (void)MNTHR_SPAWN("sigshutdown", sigshutdown);
 }
 
 
@@ -218,7 +218,7 @@ mypub(UNUSED int argc, void **argv)
     _argc = (intptr_t)argv[1];
     _argv = argv[2];
 
-    mrkthr_sleep(10000);
+    mnthr_sleep(10000);
     CTRACE("Starting publishing ...");
 
     for (i = 0; i < _argc; ++i) {
@@ -312,7 +312,7 @@ run_conn(int argc, char **argv)
         goto err;
     }
 
-    (void)MRKTHR_SPAWN("pub", mypub, chan, argc, argv);
+    (void)MNTHR_SPAWN("pub", mypub, chan, argc, argv);
 
     (void)amqp_consumer_handle_content(cons, my_content_cb, NULL, NULL);
 
@@ -353,7 +353,7 @@ run0(UNUSED int argc, void **argv)
     _argc = (intptr_t)argv[0];
     _argv = argv[1];
 
-    mrkamqp_init();
+    mnamqp_init();
 
     while (!shutting_down) {
         if (create_conn() != 0) {
@@ -366,7 +366,7 @@ run0(UNUSED int argc, void **argv)
 err:
         assert(conn == NULL);
         CTRACE("Reconnecting ...");
-        mrkthr_sleep(1000);
+        mnthr_sleep(1000);
         continue;
     }
 
@@ -427,14 +427,14 @@ main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    mrkthr_init();
+    mnthr_init();
 
-    (void)MRKTHR_SPAWN("run0", run0, argc, argv);
+    (void)MNTHR_SPAWN("run0", run0, argc, argv);
 
-    mrkthr_loop();
+    mnthr_loop();
 
     _shutdown();
-    mrkthr_fini();
+    mnthr_fini();
 
     return 0;
 }

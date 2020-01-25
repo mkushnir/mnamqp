@@ -2,15 +2,15 @@
 #include <signal.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkamqp_testfoo);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnamqp_testfoo);
 #endif
 
 #define TRRET_DEBUG
-#include <mrkcommon/dumpm.h>
+#include <mncommon/dumpm.h>
 
-#include <mrkamqp_private.h>
-#include <mrkthr.h>
+#include <mnamqp_private.h>
+#include <mnthr.h>
 
 #include "diag.h"
 
@@ -28,8 +28,8 @@ _shutdown(UNUSED int argc, UNUSED void **argv)
     amqp_conn_close(conn, 0);
     amqp_conn_post_close(conn);
     amqp_conn_destroy(&conn);
-    mrkamqp_fini();
-    //mrkthr_fini();
+    mnamqp_fini();
+    //mnthr_fini();
 #ifdef DO_MEMDEBUG
     memdebug_print_stats();
 #endif
@@ -41,7 +41,7 @@ _shutdown(UNUSED int argc, UNUSED void **argv)
 static void
 myterm(UNUSED int sig)
 {
-    (void)MRKTHR_SPAWN("shutdown_thread", _shutdown);
+    (void)MNTHR_SPAWN("shutdown_thread", _shutdown);
 }
 
 static int
@@ -55,8 +55,8 @@ mypub(UNUSED int argc, void **argv)
     while (1) {
         char buf[1024];
 
-        mrkthr_sleep(15000);
-        snprintf(buf, sizeof(buf), "data %ld", mrkthr_get_now_nsec());
+        mnthr_sleep(15000);
+        snprintf(buf, sizeof(buf), "data %ld", mnthr_get_now_nsec());
         TRACEC("%s", buf);
         //if (amqp_channel_publish(chan,
         //                         "",
@@ -183,7 +183,7 @@ run(UNUSED int argc, UNUSED void **argv)
         goto err;
     }
 
-    (void)MRKTHR_SPAWN("pub", mypub, chan);
+    (void)MNTHR_SPAWN("pub", mypub, chan);
 
     amqp_consumer_handle_content(cons, my_content_cb, NULL, NULL);
 
@@ -211,15 +211,15 @@ static void
 test1(void)
 {
 
-    mrkthr_init();
-    mrkamqp_init();
+    mnthr_init();
+    mnamqp_init();
 
-    (void)MRKTHR_SPAWN("run", run);
+    (void)MNTHR_SPAWN("run", run);
 
-    mrkthr_loop();
+    mnthr_loop();
 
-    mrkamqp_fini();
-    mrkthr_fini();
+    mnamqp_fini();
+    mnthr_fini();
 }
 
 
@@ -230,12 +230,12 @@ main(void)
     MEMDEBUG_REGISTER(array);
     MEMDEBUG_REGISTER(bytes);
     MEMDEBUG_REGISTER(bytestream);
-    MEMDEBUG_REGISTER(mrkamqp);
-    MEMDEBUG_REGISTER(mrkamqp_wire);
-    MEMDEBUG_REGISTER(mrkamqp_frame);
-    MEMDEBUG_REGISTER(mrkamqp_spec);
-    MEMDEBUG_REGISTER(mrkamqp_rpc);
-    MEMDEBUG_REGISTER(mrkamqp_testfoo);
+    MEMDEBUG_REGISTER(mnamqp);
+    MEMDEBUG_REGISTER(mnamqp_wire);
+    MEMDEBUG_REGISTER(mnamqp_frame);
+    MEMDEBUG_REGISTER(mnamqp_spec);
+    MEMDEBUG_REGISTER(mnamqp_rpc);
+    MEMDEBUG_REGISTER(mnamqp_testfoo);
 #endif
 
     if (signal(SIGINT, myterm) == SIG_ERR) {

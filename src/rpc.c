@@ -1,23 +1,23 @@
 #include <assert.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkamqp_rpc);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnamqp_rpc);
 #endif
 
-#include <mrkcommon/bytestream.h>
+#include <mncommon/bytestream.h>
 //#define TRRET_DEBUG
 //#define TRRET_DEBUG_VERBOSE
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
 
-#include <mrkamqp_private.h>
+#include <mnamqp_private.h>
 
 #include "diag.h"
 
 
 typedef struct _rpc_call_completion {
-    mrkthr_signal_t sig;
+    mnthr_signal_t sig;
     struct _amqp_rpc *rpc;
     amqp_consumer_content_cb_t response_cb;
     void *udata;
@@ -30,7 +30,7 @@ rpc_call_item_fini(UNUSED mnbytes_t *key, void *value) {
     rpc_call_completion_t *cc;
 
     cc = value;
-    mrkthr_signal_error(&cc->sig, MRKAMQP_STOP_THREADS);
+    mnthr_signal_error(&cc->sig, MNAMQP_STOP_THREADS);
     return 0;
 }
 
@@ -262,7 +262,7 @@ amqp_rpc_client_cb(UNUSED amqp_frame_t *method,
             if (cc->response_cb != NULL) {
                 res = cc->response_cb(method, header, data, cc->udata);
             }
-            mrkthr_signal_send(&cc->sig);
+            mnthr_signal_send(&cc->sig);
         }
     } else {
         CTRACE("no correlation_id in header, ignoring:");
@@ -372,7 +372,7 @@ amqp_rpc_call(amqp_rpc_t *rpc,
     params.request_header_cb = request_header_cb;
     params.header_udata = header_udata;
 
-    mrkthr_signal_init(&cc.sig, mrkthr_me());
+    mnthr_signal_init(&cc.sig, mnthr_me());
     cc.rpc = rpc;
     cc.response_cb = response_cb;
     cc.udata = header_udata;
@@ -392,7 +392,7 @@ amqp_rpc_call(amqp_rpc_t *rpc,
         goto err;
     }
 
-    if (mrkthr_signal_subscribe(&cc.sig) != 0) {
+    if (mnthr_signal_subscribe(&cc.sig) != 0) {
         res = AMQP_RPC_CALL + 2;
         goto err;
     }
@@ -400,7 +400,7 @@ amqp_rpc_call(amqp_rpc_t *rpc,
 end:
     hash_remove_item(&rpc->calls, params.cid);
     BYTES_DECREF(&params.cid); // nref 0
-    mrkthr_signal_fini(&cc.sig);
+    mnthr_signal_fini(&cc.sig);
     return res;
 err:
     TR(res);
@@ -447,13 +447,13 @@ amqp_rpc_run_spawn_worker(UNUSED int argc, void **argv)
 }
 
 
-mrkthr_ctx_t *
+mnthr_ctx_t *
 amqp_rpc_run_spawn(amqp_rpc_t *rpc)
 {
     assert(rpc->cons != NULL);
     assert(rpc->cccb != NULL);
     assert(rpc->clcb != NULL);
-    return MRKTHR_SPAWN("amqrpc", amqp_rpc_run_spawn_worker, rpc);
+    return MNTHR_SPAWN("amqrpc", amqp_rpc_run_spawn_worker, rpc);
 }
 
 int

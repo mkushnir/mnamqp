@@ -1,20 +1,20 @@
-#ifndef MRKAMQP_H_DEFINED
-#define MRKAMQP_H_DEFINED
+#ifndef MNAMQP_H_DEFINED
+#define MNAMQP_H_DEFINED
 
-#include <mrkcommon/array.h>
-#include <mrkcommon/bytes.h>
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/hash.h>
-#include <mrkcommon/stqueue.h>
+#include <mncommon/array.h>
+#include <mncommon/bytes.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/hash.h>
+#include <mncommon/stqueue.h>
 
-#include <mrkthr.h>
+#include <mnthr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifndef MRKAMQP_SYNC
-#define MRKAMQP_SYNC
+#ifndef MNAMQP_SYNC
+#define MNAMQP_SYNC
 #endif
 
 struct _amqp_channel;
@@ -35,14 +35,14 @@ typedef struct _amqp_conn {
     int fd;
     mnbytestream_t ins;
     mnbytestream_t outs;
-    mrkthr_ctx_t *recv_thread;
-    mrkthr_ctx_t *send_thread;
-    mrkthr_ctx_t *heartbeat_thread;
+    mnthr_ctx_t *recv_thread;
+    mnthr_ctx_t *send_thread;
+    mnthr_ctx_t *heartbeat_thread;
     uint64_t last_sock_op;
     /* outgoing frames */
     STQUEUE(_amqp_frame, oframes);
-    mrkthr_signal_t oframe_sig;
-    mrkthr_signal_t ping_sig;
+    mnthr_signal_t oframe_sig;
+    mnthr_signal_t ping_sig;
     void *(*buffer_alloc)(size_t);
     void (*buffer_free)(void *);
 
@@ -56,7 +56,7 @@ typedef struct _amqp_conn {
 
 typedef struct _amqp_pending_pub {
     DTQUEUE_ENTRY(_amqp_pending_pub, link);
-    mrkthr_signal_t sig;
+    mnthr_signal_t sig;
     uint64_t publish_tag;
 } amqp_pending_pub_t;
 
@@ -65,8 +65,8 @@ typedef struct _amqp_channel {
     amqp_conn_t *conn;
     /* incoming frames */
     STQUEUE(_amqp_frame, iframes);
-    mrkthr_signal_t expect_sig;
-    mrkthr_sema_t sync_sema;
+    mnthr_signal_t expect_sig;
+    mnthr_sema_t sync_sema;
     mnhash_t consumers;
     /* strong ref */
     struct _amqp_consumer *default_consumer;
@@ -95,9 +95,9 @@ typedef int (*amqp_consumer_content_cb_t)(amqp_frame_t *,
 typedef struct _amqp_consumer {
     amqp_channel_t *chan;
     mnbytes_t *consumer_tag;
-    mrkthr_signal_t content_sig;
+    mnthr_signal_t content_sig;
     STQUEUE(_amqp_pending_content, pending_content);
-    mrkthr_ctx_t *content_thread;
+    mnthr_ctx_t *content_thread;
     amqp_consumer_content_cb_t content_cb;
     amqp_consumer_content_cb_t cancel_cb;
     void *content_udata;
@@ -192,21 +192,21 @@ amqp_conn_t *amqp_conn_new(const char *,
 size_t amqp_conn_oframes_length(amqp_conn_t *);
 void amqp_conn_destroy(amqp_conn_t **);
 int amqp_conn_open(amqp_conn_t *);
-MRKAMQP_SYNC int amqp_conn_run(amqp_conn_t *);
+MNAMQP_SYNC int amqp_conn_run(amqp_conn_t *);
 int amqp_conn_ping(amqp_conn_t *);
 #define AMQP_CONN_CLOSE_FFAST (0x01)
-MRKAMQP_SYNC int amqp_conn_close(amqp_conn_t *, int);
+MNAMQP_SYNC int amqp_conn_close(amqp_conn_t *, int);
 void amqp_conn_post_close(amqp_conn_t *);
 
 
 /*
  * channel
  */
-MRKAMQP_SYNC amqp_channel_t *amqp_create_channel(amqp_conn_t *);
+MNAMQP_SYNC amqp_channel_t *amqp_create_channel(amqp_conn_t *);
 size_t amqp_channel_iframes_length(amqp_channel_t *);
 #define CHANNEL_CONFIRM_FNOWAIT         0x01
-MRKAMQP_SYNC int amqp_channel_confirm(amqp_channel_t *, uint8_t);
-MRKAMQP_SYNC int amqp_close_channel(amqp_channel_t *);
+MNAMQP_SYNC int amqp_channel_confirm(amqp_channel_t *, uint8_t);
+MNAMQP_SYNC int amqp_close_channel(amqp_channel_t *);
 void amqp_close_channel_fast(amqp_channel_t *);
 
 #define DECLARE_EXCHANGE_FPASSIVE       0x01
@@ -214,14 +214,14 @@ void amqp_close_channel_fast(amqp_channel_t *);
 #define DECLARE_EXCHANGE_FAUTODELETE    0x04
 #define DECLARE_EXCHANGE_FINTERNAL      0x08
 #define DECLARE_EXCHANGE_FNOWAIT        0x10
-MRKAMQP_SYNC int amqp_channel_declare_exchange(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_declare_exchange(amqp_channel_t *,
                                                const char *,
                                                const char *,
                                                uint8_t);
 
 #define DELETE_EXCHANGE_FIFUNUSED       0x01
 #define DELETE_EXCHANGE_FNOWAIT         0x02
-MRKAMQP_SYNC int amqp_channel_delete_exchange(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_delete_exchange(amqp_channel_t *,
                                               const char *,
                                               uint8_t);
 
@@ -230,42 +230,42 @@ MRKAMQP_SYNC int amqp_channel_delete_exchange(amqp_channel_t *,
 #define DECLARE_QUEUE_FEXCLUSIVE        0x04
 #define DECLARE_QUEUE_FAUTODELETE       0x08
 #define DECLARE_QUEUE_FNOWAIT           0x10
-MRKAMQP_SYNC int amqp_channel_declare_queue(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_declare_queue(amqp_channel_t *,
                                             const char *,
                                             uint8_t);
 
 #define BIND_QUEUE_FNOWAIT              0x01
-MRKAMQP_SYNC int amqp_channel_bind_queue(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_bind_queue(amqp_channel_t *,
                                          const char *,
                                          const char *,
                                          const char *,
                                          uint8_t);
 
-MRKAMQP_SYNC int amqp_channel_unbind_queue(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_unbind_queue(amqp_channel_t *,
                                            const char *,
                                            const char *,
                                            const char *);
 
 #define PURGE_QUEUE_FNOWAIT             0x01
-MRKAMQP_SYNC int amqp_channel_purge_queue(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_purge_queue(amqp_channel_t *,
                                           const char *,
                                           uint8_t);
 
 #define DELETE_QUEUE_FIFUNUSED          0x01
 #define DELETE_QUEUE_FIFEMPTY           0x02
 #define DELETE_QUEUE_FNOWAIT            0x04
-MRKAMQP_SYNC int amqp_channel_delete_queue(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_delete_queue(amqp_channel_t *,
                               const char *,
                               uint8_t);
 
 #define QOS_FGLOBAL                     0x01
-MRKAMQP_SYNC int amqp_channel_qos(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_qos(amqp_channel_t *,
                      uint32_t,
                      uint16_t,
                      uint8_t);
 
 #define FLOW_ACTIVE                     0x01
-MRKAMQP_SYNC int amqp_channel_flow(amqp_channel_t *, uint8_t);
+MNAMQP_SYNC int amqp_channel_flow(amqp_channel_t *, uint8_t);
 
 #if 0 // see amqp_channel_create_consumer()
 #define CONSUME_FNOLOCAL                0x01
@@ -289,7 +289,7 @@ typedef void (*amqp_header_completion_cb)(amqp_channel_t *,
                                           amqp_header_t *,
                                           void *);
 
-MRKAMQP_SYNC int amqp_channel_publish(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_publish(amqp_channel_t *,
                          const char *,
                          const char *,
                          uint8_t,
@@ -298,7 +298,7 @@ MRKAMQP_SYNC int amqp_channel_publish(amqp_channel_t *,
                          const char *,
                          ssize_t);
 
-MRKAMQP_SYNC int amqp_channel_publish_ex(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_publish_ex(amqp_channel_t *,
                             const char *,
                             const char *,
                             uint8_t,
@@ -307,7 +307,7 @@ MRKAMQP_SYNC int amqp_channel_publish_ex(amqp_channel_t *,
 
 typedef int (*amqp_channel_publish_cb_t)(amqp_conn_t *, void *);
 
-MRKAMQP_SYNC int amqp_channel_publish_ex2(amqp_channel_t *,
+MNAMQP_SYNC int amqp_channel_publish_ex2(amqp_channel_t *,
                             const char *,
                             const char *,
                             uint8_t,
@@ -326,7 +326,7 @@ void amqp_channel_drain_methods(amqp_channel_t *);
 #define CONSUME_FNOACK                  0x02
 #define CONSUME_FEXCLUSIVE              0x04
 #define CONSUME_FNOWAIT                 0x08
-MRKAMQP_SYNC amqp_consumer_t *amqp_channel_create_consumer(amqp_channel_t *,
+MNAMQP_SYNC amqp_consumer_t *amqp_channel_create_consumer(amqp_channel_t *,
                                                            const char *,
                                                            const char *,
                                                            uint8_t);
@@ -343,7 +343,7 @@ int amqp_consumer_handle_content(amqp_consumer_t *,
                                  amqp_consumer_content_cb_t,
                                  void *);
 
-MRKAMQP_SYNC int amqp_close_consumer(amqp_consumer_t *);
+MNAMQP_SYNC int amqp_close_consumer(amqp_consumer_t *);
 void amqp_close_consumer_fast(amqp_consumer_t *);
 
 
@@ -397,23 +397,23 @@ AMQP_HEADER_SET_DECL(app_id, mnbytes_t *);
 AMQP_HEADER_SET_DECL(cluster_id, mnbytes_t *);
 
 
-#define MRKAMQP_STOP_THREADS (-128)
-#define MRKAMQP_PROTOCOL_ERROR (-129)
-#define MRKAMQP_CONSUME_NACK (-130)
+#define MNAMQP_STOP_THREADS (-128)
+#define MNAMQP_PROTOCOL_ERROR (-129)
+#define MNAMQP_CONSUME_NACK (-130)
 /*
  * rpc
  */
 amqp_rpc_t *amqp_rpc_new(char *, char *, char *);
 void amqp_rpc_destroy(amqp_rpc_t **);
-MRKAMQP_SYNC int amqp_rpc_setup_client(amqp_rpc_t *, amqp_channel_t *);
-MRKAMQP_SYNC int amqp_rpc_setup_server(amqp_rpc_t *,
+MNAMQP_SYNC int amqp_rpc_setup_client(amqp_rpc_t *, amqp_channel_t *);
+MNAMQP_SYNC int amqp_rpc_setup_server(amqp_rpc_t *,
                                        amqp_channel_t *,
                                        amqp_rpc_server_handler_t,
                                        void *);
 int amqp_rpc_run(amqp_rpc_t *);
-mrkthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
-MRKAMQP_SYNC int amqp_rpc_teardown(amqp_rpc_t *);
-MRKAMQP_SYNC int amqp_rpc_call(amqp_rpc_t *,
+mnthr_ctx_t *amqp_rpc_run_spawn(amqp_rpc_t *);
+MNAMQP_SYNC int amqp_rpc_teardown(amqp_rpc_t *);
+MNAMQP_SYNC int amqp_rpc_call(amqp_rpc_t *,
                   const char *,
                   size_t,
                   amqp_rpc_request_header_cb_t,
@@ -423,12 +423,12 @@ MRKAMQP_SYNC int amqp_rpc_call(amqp_rpc_t *,
 /*
  * module
  */
-void mrkamqp_init(void);
-void mrkamqp_fini(void);
+void mnamqp_init(void);
+void mnamqp_fini(void);
 
-const char *mrkamqp_diag_str(int);
+const char *mnamqp_diag_str(int);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* MRKAMQP_H_DEFINED */
+#endif /* MNAMQP_H_DEFINED */

@@ -1,5 +1,5 @@
-#ifndef MRKAMQP_PRIVATE_H_DEFINED
-#define MRKAMQP_PRIVATE_H_DEFINED
+#ifndef MNAMQP_PRIVATE_H_DEFINED
+#define MNAMQP_PRIVATE_H_DEFINED
 
 #ifdef HAVE_CONFIG_H
 #   include "config.h"
@@ -43,19 +43,19 @@
 #define be64toh(x) bswap_64 (x)
 #endif
 
-#include <mrkcommon/array.h>
-#include <mrkcommon/bytes.h>
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/hash.h>
-#include <mrkcommon/stqueue.h>
+#include <mncommon/array.h>
+#include <mncommon/bytes.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/hash.h>
+#include <mncommon/stqueue.h>
 
-#include <mrkthr.h>
+#include <mnthr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define MRKAMQP_SYNC
+#define MNAMQP_SYNC
 
 /*
  * wire
@@ -801,7 +801,7 @@ void amqp_meth_params_destroy(amqp_meth_params_t **);
 typedef void (*amqp_frame_completion_cb_t)(struct _amqp_channel *,
                                            amqp_frame_t *,
                                            void *);
-MRKAMQP_SYNC int amqp_channel_declare_exchange_ex(struct _amqp_channel *,
+MNAMQP_SYNC int amqp_channel_declare_exchange_ex(struct _amqp_channel *,
                                                   const char *,
                                                   const char *,
                                                   uint8_t,
@@ -809,14 +809,14 @@ MRKAMQP_SYNC int amqp_channel_declare_exchange_ex(struct _amqp_channel *,
                                                   amqp_frame_completion_cb_t,
                                                   amqp_frame_completion_cb_t,
                                                   void *);
-MRKAMQP_SYNC int amqp_channel_declare_queue_ex(struct _amqp_channel *,
+MNAMQP_SYNC int amqp_channel_declare_queue_ex(struct _amqp_channel *,
                                                const char *,
                                                uint8_t,
                                                amqp_frame_completion_cb_t,
                                                amqp_frame_completion_cb_t,
                                                amqp_frame_completion_cb_t,
                                                void *);
-MRKAMQP_SYNC int amqp_channel_bind_queue_ex(struct _amqp_channel *,
+MNAMQP_SYNC int amqp_channel_bind_queue_ex(struct _amqp_channel *,
                                             const char *,
                                             const char *,
                                             const char *,
@@ -825,7 +825,7 @@ MRKAMQP_SYNC int amqp_channel_bind_queue_ex(struct _amqp_channel *,
                                             amqp_frame_completion_cb_t,
                                             amqp_frame_completion_cb_t,
                                             void *udata);
-MRKAMQP_SYNC int amqp_channel_unbind_queue_ex(struct _amqp_channel *,
+MNAMQP_SYNC int amqp_channel_unbind_queue_ex(struct _amqp_channel *,
                                               const char *,
                                               const char *,
                                               const char *,
@@ -838,6 +838,6 @@ MRKAMQP_SYNC int amqp_channel_unbind_queue_ex(struct _amqp_channel *,
 }
 #endif
 
-#include <mrkamqp.h>
+#include <mnamqp.h>
 
-#endif /* MRKAMQP_PRIVATE_H_DEFINED */
+#endif /* MNAMQP_PRIVATE_H_DEFINED */

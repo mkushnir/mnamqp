@@ -13,21 +13,21 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
 
-#include <mrkthr.h>
+#include <mnthr.h>
 
-#include <mrkamqp_private.h>
+#include <mnamqp_private.h>
 
 #include "diag.h"
 #include "mygauge.h"
 
 
 static bool shutting_down = false;
-static mrkthr_ctx_t *run_thread = NULL;
-static mrkthr_ctx_t *monitor_thread = NULL;
+static mnthr_ctx_t *run_thread = NULL;
+static mnthr_ctx_t *monitor_thread = NULL;
 
 static size_t lo_payload_size = 1024;
 static size_t hi_payload_size = 1024;
@@ -50,7 +50,7 @@ UNUSED
 static void
 myinfo(UNUSED int sig)
 {
-    mrkthr_dump_all_ctxes();
+    mnthr_dump_all_ctxes();
 }
 
 
@@ -58,11 +58,11 @@ static int
 _shutdown(UNUSED int argc, UNUSED void **argv)
 {
     if (run_thread != NULL) {
-        (void)mrkthr_set_interrupt_and_join(run_thread);
+        (void)mnthr_set_interrupt_and_join(run_thread);
         run_thread = NULL;
     }
     if (monitor_thread != NULL) {
-        (void)mrkthr_set_interrupt_and_join(monitor_thread);
+        (void)mnthr_set_interrupt_and_join(monitor_thread);
         monitor_thread = NULL;
     }
 
@@ -93,7 +93,7 @@ _shutdown(UNUSED int argc, UNUSED void **argv)
         routing_key = NULL;
     }
 
-    mrkthr_shutdown();
+    mnthr_shutdown();
     CTRACE("...shutdown OK");
     return 0;
 }
@@ -105,7 +105,7 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
 
     CTRACE("Shutting down ...");
     shutting_down = true;
-    MRKTHR_SPAWN("_shutdown", _shutdown);
+    MNTHR_SPAWN("_shutdown", _shutdown);
     return 0;
 }
 
@@ -113,7 +113,7 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
 static void
 myterm(UNUSED int sig)
 {
-    (void)MRKTHR_SPAWN_SIG("sigshutdown", sigshutdown);
+    (void)MNTHR_SPAWN_SIG("sigshutdown", sigshutdown);
 }
 
 
@@ -121,7 +121,7 @@ static int
 mymonitor(UNUSED int argc, UNUSED void **argv)
 {
     while (!shutting_down) {
-        if (mrkthr_sleep(1000) != 0) {
+        if (mnthr_sleep(1000) != 0) {
             break;
         }
         TRACEC("pub:%ld\t%ld\t%ld\n", mygauge_flush(&published), mygauge_flush(&published_bytes), mygauge_flush(&oframes));
@@ -139,7 +139,7 @@ mycb(UNUSED amqp_channel_t *chan,
 }
 
 
-#define MRKCOMMON_ALIGN_CEILING(x, r) (((x) % (r)) ? ((x) + (r) - (x) % (r)) : x)
+#define MNCOMMON_ALIGN_CEILING(x, r) (((x) % (r)) ? ((x) + (r) - (x) % (r)) : x)
 
 static int
 run0(UNUSED int argc, UNUSED void **argv)
@@ -148,14 +148,14 @@ run0(UNUSED int argc, UNUSED void **argv)
     amqp_channel_t *chan;
     mnbytestream_t bs;
 
-    mrkamqp_init();
+    mnamqp_init();
     conn = amqp_conn_new(host,
                          port,
                          user,
                          password,
                          vhost,
                          0,
-                         MAX(MRKCOMMON_ALIGN_CEILING(hi_payload_size, 1024), 0x20000),
+                         MAX(MNCOMMON_ALIGN_CEILING(hi_payload_size, 1024), 0x20000),
                          0,
                          AMQP_CAP_PUBLISHER_CONFIRMS);
 
@@ -183,7 +183,7 @@ run0(UNUSED int argc, UNUSED void **argv)
         } else {
             payload_size = (ssize_t)lo_payload_size;
         }
-        before = MRKTHR_GET_NOW_FSEC_PRECISE();
+        before = MNTHR_GET_NOW_FSEC_PRECISE();
         res = amqp_channel_publish(chan,
                                    exchange,
                                    routing_key,
@@ -192,9 +192,9 @@ run0(UNUSED int argc, UNUSED void **argv)
                                    NULL,
                                    (char *)SDATA(&bs, 0),
                                    payload_size);
-        after = MRKTHR_GET_NOW_FSEC_PRECISE();
+        after = MNTHR_GET_NOW_FSEC_PRECISE();
         //CTRACE("res=%d time=%lf", res, after - before);
-        mrkthr_sleep(publish_sleep);
+        mnthr_sleep(publish_sleep);
         mygauge_incr(&published, 1);
         mygauge_update(&oframes, amqp_conn_oframes_length(conn));
     }
@@ -203,7 +203,7 @@ end:
     amqp_conn_close(conn, 0);
     amqp_conn_post_close(conn);
     amqp_conn_destroy(&conn);
-    mrkamqp_fini();
+    mnamqp_fini();
     bytestream_fini(&bs);
 
     return 0;
@@ -344,13 +344,13 @@ main(int argc, char **argv)
     }
 
     srandom(time(NULL));
-    mrkthr_init();
+    mnthr_init();
 
-    run_thread = MRKTHR_SPAWN("run0", run0);
-    monitor_thread = MRKTHR_SPAWN("monitor", mymonitor);
+    run_thread = MNTHR_SPAWN("run0", run0);
+    monitor_thread = MNTHR_SPAWN("monitor", mymonitor);
 
-    mrkthr_loop();
-    mrkthr_fini();
+    mnthr_loop();
+    mnthr_fini();
     TRACE("Exiting main ...");
     return 0;
 }

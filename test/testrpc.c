@@ -7,17 +7,17 @@
 #include <unistd.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkamqp_testrpc);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnamqp_testrpc);
 #endif
 
 #define TRRET_DEBUG
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/traversedir.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/traversedir.h>
 
-#include <mrkthr.h>
+#include <mnthr.h>
 
-#include <mrkamqp_private.h>
+#include <mnamqp_private.h>
 
 
 #include "diag.h"
@@ -42,7 +42,7 @@ UNUSED
 static void
 myinfo(UNUSED int sig)
 {
-    mrkthr_dump_all_ctxes();
+    mnthr_dump_all_ctxes();
 #ifdef DO_MEMDEBUG
     //memdebug_print_stats_oneline();
     memdebug_print_stats();
@@ -53,8 +53,8 @@ myinfo(UNUSED int sig)
 static void
 _shutdown(void)
 {
-    mrkamqp_fini();
-    mrkthr_shutdown();
+    mnamqp_fini();
+    mnthr_shutdown();
 #ifdef DO_MEMDEBUG
     //memdebug_print_stats_oneline();
     memdebug_print_stats();
@@ -89,7 +89,7 @@ sigshutdown(UNUSED int argc, UNUSED void **argv)
 static void
 myterm(UNUSED int sig)
 {
-    (void)MRKTHR_SPAWN("sigshutdown", sigshutdown);
+    (void)MNTHR_SPAWN("sigshutdown", sigshutdown);
 }
 
 
@@ -168,7 +168,7 @@ run_conn(void)
 
             mnbytes_t *request;
 
-            request = bytes_printf("test %ld", mrkthr_get_now_nsec());
+            request = bytes_printf("test %ld", mnthr_get_now_nsec());
             res = amqp_rpc_call(rpc,
                                 BCDATA(request),
                                 BSZ(request),
@@ -177,14 +177,14 @@ run_conn(void)
                                 NULL);
             BYTES_DECREF(&request);
             if (res != 0) {
-                if (res != (int)MRKTHR_WAIT_TIMEOUT) {
+                if (res != (int)MNTHR_WAIT_TIMEOUT) {
                     CTRACE("breaking loop ...");
                     break;
                 } else {
                     CTRACE("timeout, skipping ...");
                 }
             }
-            mrkthr_sleep(1000);
+            mnthr_sleep(1000);
         }
 
     } else {
@@ -256,7 +256,7 @@ run0(UNUSED int argc, UNUSED void **argv)
 
     res = 0;
 
-    mrkamqp_init();
+    mnamqp_init();
 
     while (!shutting_down) {
         if (create_conn() != 0) {
@@ -269,8 +269,8 @@ run0(UNUSED int argc, UNUSED void **argv)
 err:
         assert(conn == NULL);
         CTRACE("Reconnecting ...");
-        mrkthr_sleep(1000);
-        mrkthr_set_retval(0);
+        mnthr_sleep(1000);
+        mnthr_set_retval(0);
         continue;
     }
 
@@ -288,12 +288,12 @@ main(int argc, char **argv)
     MEMDEBUG_REGISTER(array);
     MEMDEBUG_REGISTER(bytes);
     MEMDEBUG_REGISTER(bytestream);
-    MEMDEBUG_REGISTER(mrkamqp);
-    MEMDEBUG_REGISTER(mrkamqp_wire);
-    MEMDEBUG_REGISTER(mrkamqp_frame);
-    MEMDEBUG_REGISTER(mrkamqp_spec);
-    MEMDEBUG_REGISTER(mrkamqp_rpc);
-    MEMDEBUG_REGISTER(mrkamqp_testrpc);
+    MEMDEBUG_REGISTER(mnamqp);
+    MEMDEBUG_REGISTER(mnamqp_wire);
+    MEMDEBUG_REGISTER(mnamqp_frame);
+    MEMDEBUG_REGISTER(mnamqp_spec);
+    MEMDEBUG_REGISTER(mnamqp_rpc);
+    MEMDEBUG_REGISTER(mnamqp_testrpc);
 #endif
 
     if (signal(SIGINT, myterm) == SIG_ERR) {
@@ -332,14 +332,14 @@ main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    mrkthr_init();
+    mnthr_init();
 
-    MRKTHR_SPAWN("run0", run0);
+    MNTHR_SPAWN("run0", run0);
 
-    mrkthr_loop();
+    mnthr_loop();
 
     _shutdown();
-    mrkthr_fini();
+    mnthr_fini();
 
 #ifdef DO_MEMDEBUG
     //memdebug_print_stats_oneline();

@@ -1,4 +1,4 @@
-AC_INIT(mrkamqp, 0.1, markiyan.kushnir@gmail.com, mrkamqp, https://github.com/mkushnir)
+AC_INIT(mnamqp, 0.1, markiyan.kushnir@gmail.com, mnamqp, https://github.com/mkushnir)
 if test -n "$USE_GCC"
 then
     probe="gcc${USE_GCC}"
@@ -98,11 +98,11 @@ AC_FUNC_REALLOC
 
 AC_PRESERVE_HELP_ORDER
 
-AC_SUBST(MRKCOMMON_LOCAL_CFLAGS, [''])
-AC_SUBST(MRKCOMMON_LOCAL_LDFLAGS, [''])
+AC_SUBST(MNCOMMON_LOCAL_CFLAGS, [''])
+AC_SUBST(MNCOMMON_LOCAL_LDFLAGS, [''])
 
-AC_SUBST(MRKTHR_LOCAL_CFLAGS, [''])
-AC_SUBST(MRKTHR_LOCAL_LDFLAGS, [''])
+AC_SUBST(MNTHR_LOCAL_CFLAGS, [''])
+AC_SUBST(MNTHR_LOCAL_LDFLAGS, [''])
 
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--enable-debug],
@@ -114,6 +114,6 @@ AM_CONDITIONAL([LINUX], [echo $build_os | grep linux >/dev/null])
 AM_CONDITIONAL([FREEBSD], [echo $build_os | grep freebsd >/dev/null])
 
 #dnl pass LDFLAGS=-L${LOCALBASE}/lib in the environment
-AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required. Please find it at git@github.com:mkushnir/mrkcommon.git)])
+AC_CHECK_LIB(mncommon, _fini, [], [AC_MSG_FAILURE(libmncommon.so is required. Please find it at git@github.com:mkushnir/mncommon.git)])
 
 AC_OUTPUT

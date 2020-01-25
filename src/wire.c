@@ -2,19 +2,19 @@
 #include <string.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkamqp_wire);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnamqp_wire);
 #endif
 
-#include <mrkcommon/hash.h>
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/bytes.h>
+#include <mncommon/hash.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/bytes.h>
 //#define TRRET_DEBUG
 //#define TRRET_DEBUG_VERBOSE
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
 
-#include <mrkamqp_private.h>
+#include <mnamqp_private.h>
 
 #include "diag.h"
 
@@ -1099,7 +1099,7 @@ amqp_value_destroy(amqp_value_t **v)
 
 
 void
-mrkamqp_init(void)
+mnamqp_init(void)
 {
     size_t i;
 
@@ -1117,7 +1117,7 @@ mrkamqp_init(void)
 
 
 void
-mrkamqp_fini(void)
+mnamqp_fini(void)
 {
     amqp_spec_fini();
 }

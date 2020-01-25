@@ -1,13 +1,13 @@
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkamqp_frame);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnamqp_frame);
 #endif
 
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
 
-#include "mrkamqp_private.h"
+#include "mnamqp_private.h"
 
 #include "diag.h"
 

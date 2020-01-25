@@ -1,18 +1,18 @@
 #include <inttypes.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkamqp_spec);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnamqp_spec);
 #endif
 
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/hash.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/hash.h>
 //#define TRRET_DEBUG
 //#define TRRET_DEBUG_VERBOSE
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
 
-#include <mrkamqp_private.h>
+#include <mnamqp_private.h>
 
 #include "diag.h"
 

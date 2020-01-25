@@ -10,14 +10,14 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
-#include <mrkcommon/stqueue.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
+#include <mncommon/stqueue.h>
 
-#include <mrkthr.h>
+#include <mnthr.h>
 
-#include <mrkamqp_private.h>
+#include <mnamqp_private.h>
 
 #include "diag.h"
 #include "mygauge.h"
@@ -33,11 +33,11 @@ static struct {
 static void fin0(void);
 
 static bool shutting_down = false;
-static mrkthr_ctx_t *run_thread = NULL;
-static mrkthr_ctx_t *drain_thread = NULL;
-static mrkthr_ctx_t *monitor_thread = NULL;
-static mrkthr_cond_t incond;
-static mrkthr_cond_t outcond;
+static mnthr_ctx_t *run_thread = NULL;
+static mnthr_ctx_t *drain_thread = NULL;
+static mnthr_ctx_t *monitor_thread = NULL;
+static mnthr_cond_t incond;
+static mnthr_cond_t outcond;
 
 static char *host = NULL;
 static long port = 0;
@@ -70,7 +70,7 @@ UNUSED
 static void
 myinfo(UNUSED int sig)
 {
-    mrkthr_dump_all_ctxes();
+    mnthr_dump_all_ctxes();
 }
 
 
@@ -80,15 +80,15 @@ _shutdown(UNUSED int argc, UNUSED void **argv)
     fin0();
 
     if (run_thread != NULL) {
-        (void)mrkthr_set_interrupt_and_join(run_thread);
+        (void)mnthr_set_interrupt_and_join(run_thread);
         run_thread = NULL;
     }
     if (drain_thread != NULL) {
-        (void)mrkthr_set_interrupt_and_join(drain_thread);
+        (void)mnthr_set_interrupt_and_join(drain_thread);
         drain_thread = NULL;
     }
     if (monitor_thread != NULL) {
-        (void)mrkthr_set_interrupt_and_join(monitor_thread);
+        (void)mnthr_set_interrupt_and_join(monitor_thread);
         monitor_thread = NULL;
     }
 
@@ -119,7 +119,7 @@ _shutdown(UNUSED int argc, UNUSED void **argv)
         routing_key = NULL;
     }
 
-    mrkthr_shutdown();
+    mnthr_shutdown();
     CTRACE("...shutdown OK");
     return 0;
 }
@@ -130,7 +130,7 @@ myterm(UNUSED int sig)
 {
     CTRACE("Shutting down ...");
     shutting_down = true;
-    MRKTHR_SPAWN_SIG("_shutdown", _shutdown);
+    MNTHR_SPAWN_SIG("_shutdown", _shutdown);
 }
 
 
@@ -187,7 +187,7 @@ mymonitor(UNUSED int argc, UNUSED void **argv)
     while (!shutting_down) {
         int i;
 
-        if (mrkthr_sleep(1000) != 0) {
+        if (mnthr_sleep(1000) != 0) {
             break;
         }
 
@@ -208,7 +208,7 @@ static int
 mydrain(UNUSED int argc, UNUSED void **argv)
 {
     while (!g.initialized) {
-        if (mrkthr_sleep(100) != 0) {
+        if (mnthr_sleep(100) != 0) {
             goto end;
         }
     }
@@ -225,7 +225,7 @@ mydrain(UNUSED int argc, UNUSED void **argv)
             free(msg);
             mygauge_incr(&drained, 1);
 
-            if (mrkthr_sleep(drain_sleep) != 0) {
+            if (mnthr_sleep(drain_sleep) != 0) {
                 break;
             }
 
@@ -237,8 +237,8 @@ mydrain(UNUSED int argc, UNUSED void **argv)
             }
 
         } else {
-            mrkthr_cond_signal_one(&incond);
-            mrkthr_cond_wait(&outcond);
+            mnthr_cond_signal_one(&incond);
+            mnthr_cond_wait(&outcond);
         }
 
     }
@@ -262,9 +262,9 @@ fin0(void)
             amqp_conn_close(g.conn, 0);
             amqp_conn_post_close(g.conn);
             amqp_conn_destroy(&g.conn);
-            mrkamqp_fini();
-            mrkthr_cond_fini(&incond);
-            mrkthr_cond_fini(&outcond);
+            mnamqp_fini();
+            mnthr_cond_fini(&incond);
+            mnthr_cond_fini(&outcond);
         } else {
             amqp_conn_close(g.conn, AMQP_CONN_CLOSE_FFAST);
             amqp_conn_post_close(g.conn);
@@ -291,18 +291,18 @@ mycb(UNUSED amqp_frame_t *method,
             /*
              * qmsg is over limit
              */
-            if (mrkthr_cond_wait(&incond) != 0) {
-                TRACE("mrkthr_cond_wait");
+            if (mnthr_cond_wait(&incond) != 0) {
+                TRACE("mnthr_cond_wait");
                 break;
             }
-            //if (mrkthr_sleep(2000) != 0) {
+            //if (mnthr_sleep(2000) != 0) {
             //    return 1;
             //}
         }
 
         mymessage_enqueue(data);
         mygauge_incr(&consumed[i], 1);
-        mrkthr_cond_signal_one(&outcond);
+        mnthr_cond_signal_one(&outcond);
     }
 
     return res;
@@ -326,18 +326,18 @@ mycbnoq(UNUSED amqp_frame_t *method,
             /*
              * qmsg is over limit
              */
-            if (mrkthr_cond_wait(&incond) != 0) {
-                TRACE("mrkthr_cond_wait");
+            if (mnthr_cond_wait(&incond) != 0) {
+                TRACE("mnthr_cond_wait");
                 break;
             }
-            //if (mrkthr_sleep(2000) != 0) {
+            //if (mnthr_sleep(2000) != 0) {
             //    return 1;
             //}
         }
 
         free(data);
         mygauge_incr(&consumed[i], 1);
-        if (mrkthr_sleep(drain_sleep) != 0) {
+        if (mnthr_sleep(drain_sleep) != 0) {
             res = 1;
         }
     }
@@ -511,9 +511,9 @@ run0(UNUSED int argc, UNUSED void **argv)
 
     mygauge_init(&drained, 0);
 
-    mrkthr_cond_init(&incond);
-    mrkthr_cond_init(&outcond);
-    mrkamqp_init();
+    mnthr_cond_init(&incond);
+    mnthr_cond_init(&outcond);
+    mnamqp_init();
 
     g.conn = amqp_conn_new(host, port, user, password, vhost, 0, 0, 0, 0);
 
@@ -539,14 +539,14 @@ run0(UNUSED int argc, UNUSED void **argv)
     g.fatal = false;
 
     mygauge_init(&consumed[0], 0);
-    (void)MRKTHR_SPAWN("dcons", rundcons);
+    (void)MNTHR_SPAWN("dcons", rundcons);
 
     for (i = 1; i < nconsumers; ++i) {
-        mrkthr_ctx_t *thread;
+        mnthr_ctx_t *thread;
 
         mygauge_init(&consumed[i], 0);
-        thread = MRKTHR_SPAWN(NULL, runcons, (void *)(intptr_t)i);
-        mrkthr_set_name(thread, "cons%d", i);
+        thread = MNTHR_SPAWN(NULL, runcons, (void *)(intptr_t)i);
+        mnthr_set_name(thread, "cons%d", i);
     }
 
 end:
@@ -694,14 +694,14 @@ main(int argc, char **argv)
 
     STQUEUE_INIT(&qmsg);
 
-    mrkthr_init();
+    mnthr_init();
 
-    run_thread = MRKTHR_SPAWN("run0", run0);
-    drain_thread = MRKTHR_SPAWN("drain", mydrain);
-    monitor_thread = MRKTHR_SPAWN("monitor", mymonitor);
+    run_thread = MNTHR_SPAWN("run0", run0);
+    drain_thread = MNTHR_SPAWN("drain", mydrain);
+    monitor_thread = MNTHR_SPAWN("monitor", mymonitor);
 
-    mrkthr_loop();
-    mrkthr_fini();
+    mnthr_loop();
+    mnthr_fini();
     TRACE("Exiting main (%s) ...", BDATA(qwe));
     return 0;
 }
