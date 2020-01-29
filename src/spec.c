@@ -50,16 +50,18 @@ NEWDECL(mname)                                                 \
         } else {                                       \
             (void)bytestream_nprintf(bs,               \
                                      1024,             \
-                                     #n "=%s ",        \
+                                     #n "=%p ",        \
                                      NULL);            \
         }                                              \
     } while (0)                                        \
 
 
 #define FSTRT(n)                               \
+do {                                           \
     (void)bytestream_nprintf(bs, 1024, #n "=");\
     table_str(&m->n, bs);                      \
-    (void)bytestream_cat(bs, 1, " ")           \
+    (void)bytestream_cat(bs, 1, " ");          \
+} while (0)                                    \
 
 
 
@@ -1503,13 +1505,13 @@ amqp_meth_params_destroy(amqp_meth_params_t **params)
 
 
 static uint64_t
-method_info_hash(amqp_meth_id_t mid)
+method_info_hash(const void *mid)
 {
-    return mid;
+    return (amqp_meth_id_t)mid;
 }
 
 static int
-method_info_cmp(amqp_meth_id_t a, amqp_meth_id_t b)
+method_info_cmp(const void *a, const void *b)
 {
     return (int)(int64_t)(a - b);
 }

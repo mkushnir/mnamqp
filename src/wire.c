@@ -568,7 +568,7 @@ table_str_cb(mnbytes_t *key, amqp_value_t *val, mnbytestream_t *bs)
         } else {
             (void)bytestream_nprintf(bs,
                                1024,
-                               "%s ",
+                               "%p ",
                                NULL);
         }
         break;
