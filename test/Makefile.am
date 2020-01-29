@@ -2,6 +2,7 @@ AM_MAKEFLAGS = -s
 
 CLEANFILES = *.core
 #CLEANFILES += *.in
+AM_LIBTOOLFLAGS = --silent
 
 noinst_PROGRAMS = testfoo testpubsub testrpc testspam testham
 

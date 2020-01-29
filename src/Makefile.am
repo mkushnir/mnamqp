@@ -5,6 +5,7 @@ BUILT_SOURCES = diag.c diag.h
 EXTRA_DIST = $(diags)
 CLEANFILES = $(BUILT_SOURCES) *.core
 #CLEANFILES += *.in
+AM_LIBTOOLFLAGS = --silent
 
 lib_LTLIBRARIES = libmnamqp.la
 
